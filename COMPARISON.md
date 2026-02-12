@@ -33,7 +33,7 @@ Both projects implement the same PRD: a Pomelli-to-X automation flywheel (Bun + 
 
 **flpomp-team** (parallel agent-team) produced a working but thinner MVP with ~1,030 lines of source code, 43 tests across 5 test files, no specs beyond the PRD, and several architectural gaps (HTMX returns JSON instead of HTML partials, no image resizing, no usage tracking, no error pages).
 
-The Ralph loop built 3.8x more code and 6.4x more tests. The agent-team built its output in ~8 minutes wall-clock time. These are fundamentally different tradeoffs — depth vs speed.
+The Ralph loop built 3.8x more code and 6.4x more tests in 1h 18m. The agent-team built its output in ~8 minutes wall-clock (~10x faster). These are fundamentally different tradeoffs — depth vs speed.
 
 ---
 
@@ -440,7 +440,7 @@ Better Auth or Lucia provides session-based auth that works well with server-ren
 | Test count | 274 | 43 | 6.4x |
 | Source files | 18 | 13 | 1.4x |
 | Test files | 12 | 5 | 2.4x |
-| Build time | Many iterations | ~8 min | — |
+| Build time | 1h 18m (13 sequential iterations) | ~8 min (3 parallel agents) | ~10x |
 | Specs/plans | 7 specs + impl plan | PRD only | — |
 | HTMX working | Yes | No (JSON mismatch) | — |
 | Error pages | Yes | No | — |
@@ -449,9 +449,54 @@ Better Auth or Lucia provides session-based auth that works well with server-ren
 | Session UI | Yes (banner) | No | — |
 | Retry logic | Yes | No | — |
 
+## Build Timelines (from git commit timestamps)
+
+### flpomp (Ralph loop) — 1h 18m, 13 sequential iterations
+
+```
+15:18:10  [Task 1]  Project scaffolding (Bun + Hono + TypeScript + SQLite)
+15:22:52  [Task 2]  X posting service (twitter.ts, 25 tests)                  +4m 42s
+15:27:05  [Task 3]  Queue management API (api.ts, 8 endpoints, 39 tests)      +4m 13s
+15:38:19  [Task 4]  Pomelli browser automation (pomelli.ts, 1,036 lines)      +11m 14s
+15:44:29  [Task 5]  Auth/session management (cookie import, 27 tests)          +6m 10s
+15:51:04  [Task 6]  Dashboard — Layout + New Post page (25 tests)              +6m 35s
+15:59:28  [Task 7]  Queue page with approve/edit/reject (38 tests)             +8m 24s
+16:04:34  [Task 8]  History + Settings pages (30 tests)                        +5m 06s
+16:14:06  [Task 9]  End-to-end integration + flywheel (15 tests)               +9m 32s
+16:19:54  [Task 10] Scheduled posting with croner (19 tests)                   +5m 48s
+16:23:29  [Task 11] Basic auth middleware (23 tests)                           +3m 35s
+16:25:40  [Task 12] Dockerfile + Fly.io deployment config                      +2m 11s
+16:36:04  [Task 13] Error handling, resilience, polish (28 tests)             +10m 24s
+```
+
+### flpomp-team (agent-team) — ~8 min, 4 parallel agents
+
+```
+15:23:27  package.json created (project scaffolding begins)
+15:23:50  config.ts, db.ts, server.ts (foundation complete)
+          ── 3 agents spawned in parallel ──
+15:25:40  twitter.ts              (xpost agent)
+15:25:58  scheduler.ts            (xpost agent)
+15:26:18  layout.tsx              (dashboard agent)
+15:26:21  twitter.test.ts         (xpost agent)
+15:26:23  scheduler.test.ts       (xpost agent)
+15:26:37  queue-list.tsx           (dashboard agent)
+15:26:40  history-list.tsx         (dashboard agent)
+15:27:26  api.test.ts             (dashboard agent)
+15:27:57  auth.test.ts            (pomelli agent)
+15:28:03  pages.tsx               (dashboard agent)
+15:28:24  post-card.tsx           (dashboard agent)
+15:28:42  api.ts (final version)  (dashboard agent)
+15:28:45  Dockerfile              (team lead - integration)
+15:28:49  fly.toml                (team lead - integration)
+15:29:13  server.ts (wired)       (team lead - integration)
+15:30:17  pomelli.ts (final)      (pomelli agent)
+15:30:38  pomelli.test.ts (final) (pomelli agent)
+15:31:21  bun run check — all 43 tests pass
+```
+
 ## Open Questions
 
-1. How long did the Ralph loop take to complete all 13 tasks? (No timing data in the repo — would reveal the speed tradeoff more precisely)
-2. Has either implementation been tested against the real Pomelli UI? (Selectors in both are speculative)
-3. What's the target user for monetization — individual creators, agencies, or SMBs? (Affects plan structure and pricing)
-4. Should Pomelli sessions be pooled per-tenant or shared? (Cost vs isolation tradeoff for SaaS)
+1. Has either implementation been tested against the real Pomelli UI? (Selectors in both are speculative)
+2. What's the target user for monetization — individual creators, agencies, or SMBs? (Affects plan structure and pricing)
+3. Should Pomelli sessions be pooled per-tenant or shared? (Cost vs isolation tradeoff for SaaS)

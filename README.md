@@ -167,24 +167,25 @@ This entire codebase was built autonomously in a single session using the **Ralp
 
 ### Development Timeline
 
-All 13 tasks completed in **1 hour 18 minutes** on February 12, 2026:
+All 13 tasks completed in **1 hour 18 minutes** on February 12, 2026 (from git commit timestamps):
 
-| Time | Task | Duration |
-|------|------|----------|
-| 3:18 PM | Task 1: Project scaffolding (Bun + Hono + TypeScript + SQLite) | — |
-| 3:22 PM | Task 2: X posting service (twitter.ts, 25 tests) | 4m 42s |
-| 3:27 PM | Task 3: Queue management API (api.ts, 8 endpoints, 39 tests) | 4m 13s |
-| 3:38 PM | Task 4: Pomelli browser automation (pomelli.ts, 1,035 lines, 24 tests) | 11m 14s |
-| 3:44 PM | Task 5: Auth/session management (cookie import, health check, 27 tests) | 6m 10s |
-| 3:51 PM | Task 6: Dashboard — Layout + New Post page (25 tests) | 6m 35s |
-| 3:59 PM | Task 7: Queue page with approve/edit/reject (38 tests) | 8m 24s |
-| 4:04 PM | Task 8: History + Settings pages (30 tests) | 5m 06s |
-| 4:14 PM | Task 9: End-to-end integration + flywheel orchestration (15 tests) | 9m 32s |
-| 4:19 PM | Task 10: Scheduled posting with croner (19 tests) | 5m 48s |
-| 4:23 PM | Task 11: Basic auth middleware (23 tests) | 3m 35s |
-| 4:25 PM | Task 12: Dockerfile + Fly.io config | 2m 11s |
-| 4:36 PM | Task 13: Error handling, resilience, polish (28 tests) | 10m 24s |
-| | **Total** | **1h 18m** |
+```
+15:18:10  [Task 1]  Project scaffolding (Bun + Hono + TypeScript + SQLite)
+15:22:52  [Task 2]  X posting service (twitter.ts, 25 tests)                  +4m 42s
+15:27:05  [Task 3]  Queue management API (api.ts, 8 endpoints, 39 tests)      +4m 13s
+15:38:19  [Task 4]  Pomelli browser automation (pomelli.ts, 1,036 lines)      +11m 14s
+15:44:29  [Task 5]  Auth/session management (cookie import, 27 tests)          +6m 10s
+15:51:04  [Task 6]  Dashboard — Layout + New Post page (25 tests)              +6m 35s
+15:59:28  [Task 7]  Queue page with approve/edit/reject (38 tests)             +8m 24s
+16:04:34  [Task 8]  History + Settings pages (30 tests)                        +5m 06s
+16:14:06  [Task 9]  End-to-end integration + flywheel (15 tests)               +9m 32s
+16:19:54  [Task 10] Scheduled posting with croner (19 tests)                   +5m 48s
+16:23:29  [Task 11] Basic auth middleware (23 tests)                           +3m 35s
+16:25:40  [Task 12] Dockerfile + Fly.io deployment config                      +2m 11s
+16:36:04  [Task 13] Error handling, resilience, polish (28 tests)             +10m 24s
+──────────────────────────────────────────────────────────────────────────────
+          Total wall-clock time: 1h 18m
+```
 
 Each iteration ran with completely fresh context — no conversation history carried over between tasks. The `IMPLEMENTATION_PLAN.md` file served as the only shared state, updated after each task to track progress and signal what to build next.
 
@@ -214,3 +215,26 @@ Each iteration ran with completely fresh context — no conversation history car
 ```
 
 The key insight is **backpressure**: every commit must pass `bun run check` (TypeScript compilation + Biome linting + 274 Vitest tests). If validation fails, the agent fixes the issue before committing. This ensures each iteration leaves the codebase in a working state for the next one.
+
+---
+
+## Comparison: flpomp vs flpomp-team
+
+This same PRD was also built by a different harness — **[flpomp-team](https://github.com/pyrex41/flpomp-team)** — using Claude Code with 4 parallel AI agents (team lead + 3 specialists) in a single ~8 minute session.
+
+See **[COMPARISON.md](./COMPARISON.md)** for the full analysis. Key differences:
+
+| Metric | flpomp (Ralph loop) | [flpomp-team](https://github.com/pyrex41/flpomp-team) (agent-team) | Ratio |
+|--------|---------------------|--------------------------|-------|
+| Source lines | ~3,900 | ~1,030 | 3.8x |
+| Test count | 274 | 43 | 6.4x |
+| Build time | 1h 18m (13 sequential iterations) | ~8 min (3 parallel agents) | — |
+| Specs/plans | 7 JTBD specs + implementation plan | PRD only | — |
+| HTMX working | Yes (HTML partials) | No (JSON mismatch) | — |
+| Error pages | Yes | No | — |
+| Image resize | Yes (Sharp) | No | — |
+| Usage tracking | Yes | No | — |
+| Session UI | Yes (banner) | No | — |
+| Retry logic | Yes | No | — |
+
+**TL;DR**: The Ralph loop produced a production-ready application. The agent-team produced a structural MVP in 1/10th the time. Different tools for different moments — depth vs speed.
