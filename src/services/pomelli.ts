@@ -83,6 +83,30 @@ export interface CampaignResult {
 	caption: string;
 }
 
+/**
+ * Cookie format accepted for import (matches common browser extension exports).
+ * Supports both full Playwright-style cookies and simplified exports.
+ */
+export interface ImportedCookie {
+	name: string;
+	value: string;
+	domain: string;
+	path?: string;
+	/** Expiry as Unix timestamp (seconds). */
+	expires?: number;
+	/** Alternative field name used by some export tools. */
+	expirationDate?: number;
+	httpOnly?: boolean;
+	secure?: boolean;
+	sameSite?: "Strict" | "Lax" | "None" | string;
+}
+
+export interface AuthStatus {
+	status: "active" | "expired" | "error" | "unknown";
+	message: string;
+	checkedAt: string;
+}
+
 export interface PommelliOptions {
 	/** Override browser state dir (for testing). */
 	browserStateDir?: string;
@@ -103,8 +127,20 @@ export interface PommelliOptions {
 const POMELLI_BASE_URL = "https://labs.google.com/pomelli";
 const GENERATION_TIMEOUT_MS = 120_000; // NFR-2
 const BUSINESS_DNA_TIMEOUT_MS = 90_000;
+const AUTH_STATUS_TIMEOUT_MS = 10_000; // auth-session NFR-1
 const MIN_DELAY_MS = 2_000;
 const MAX_DELAY_MS = 5_000;
+
+/**
+ * Normalize sameSite value from various export formats to Playwright format.
+ */
+function normalizeSameSite(value?: string): "Strict" | "Lax" | "None" {
+	if (!value) return "Lax";
+	const lower = value.toLowerCase();
+	if (lower === "strict") return "Strict";
+	if (lower === "none" || lower === "no_restriction") return "None";
+	return "Lax";
+}
 
 // ─── Concurrency lock (NFR-3) ─────────────────────────────────────────────────
 
@@ -266,6 +302,146 @@ export class PommelliService {
 		const ctx = await this.launch();
 		const pages = ctx.pages();
 		return pages.length > 0 ? pages[0]! : await ctx.newPage();
+	}
+
+	// ─── Cookie import (auth-session FR-4) ──────────────────────────────────
+
+	/**
+	 * Import Google cookies into the persistent browser context.
+	 * Accepts an array of cookies (e.g. from a browser extension export).
+	 * Validates format and injects into Playwright context.
+	 *
+	 * Cookies are persisted in the browser state directory (FR-5) and
+	 * never stored as separate plaintext files (NFR-2).
+	 *
+	 * @throws PommelliError if cookies are invalid or injection fails.
+	 */
+	async importCookies(cookies: ImportedCookie[]): Promise<void> {
+		if (!Array.isArray(cookies) || cookies.length === 0) {
+			throw new PommelliError(
+				"Cookies must be a non-empty array",
+				"INVALID_COOKIES",
+			);
+		}
+
+		// Validate each cookie has required fields
+		for (const cookie of cookies) {
+			if (!cookie.name || typeof cookie.name !== "string") {
+				throw new PommelliError(
+					`Cookie missing required "name" field`,
+					"INVALID_COOKIES",
+				);
+			}
+			if (cookie.value === undefined || typeof cookie.value !== "string") {
+				throw new PommelliError(
+					`Cookie "${cookie.name}" missing required "value" field`,
+					"INVALID_COOKIES",
+				);
+			}
+			if (!cookie.domain || typeof cookie.domain !== "string") {
+				throw new PommelliError(
+					`Cookie "${cookie.name}" missing required "domain" field`,
+					"INVALID_COOKIES",
+				);
+			}
+		}
+
+		// Filter to only Google-related cookies for safety
+		const googleCookies = cookies.filter(
+			(c) =>
+				c.domain.includes("google.com") ||
+				c.domain.includes("google.co") ||
+				c.domain.includes("youtube.com") ||
+				c.domain.includes("gstatic.com") ||
+				c.domain.includes("googleapis.com"),
+		);
+
+		if (googleCookies.length === 0) {
+			throw new PommelliError(
+				"No Google-related cookies found. Export cookies from a page on google.com while logged in.",
+				"NO_GOOGLE_COOKIES",
+			);
+		}
+
+		console.log(
+			`[pomelli] Importing ${googleCookies.length} Google cookies (${cookies.length} total provided)`,
+		);
+
+		const ctx = await this.launch();
+
+		// Normalize cookies to Playwright format
+		const playwrightCookies = googleCookies.map((c) => {
+			const sameSite = normalizeSameSite(c.sameSite);
+			return {
+				name: c.name,
+				value: c.value,
+				domain: c.domain,
+				path: c.path ?? "/",
+				expires: c.expires ?? c.expirationDate ?? -1,
+				httpOnly: c.httpOnly ?? false,
+				secure: c.secure ?? true,
+				sameSite: sameSite as "Strict" | "Lax" | "None",
+			};
+		});
+
+		try {
+			await ctx.addCookies(playwrightCookies);
+			console.log(
+				`[pomelli] Successfully injected ${playwrightCookies.length} cookies`,
+			);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			console.error(`[pomelli] Cookie injection failed: ${message}`);
+			throw new PommelliError(
+				`Failed to inject cookies: ${message}`,
+				"COOKIE_INJECTION_FAILED",
+			);
+		}
+	}
+
+	// ─── Auth status check (auth-session FR-2) ──────────────────────────────
+
+	/**
+	 * Check the Google authentication status by navigating to Pomelli.
+	 * Returns structured status with message, completes within 10s (NFR-1).
+	 */
+	async getAuthStatus(): Promise<AuthStatus> {
+		const checkedAt = new Date().toISOString();
+
+		try {
+			const isActive = await Promise.race([
+				this.checkSession(),
+				new Promise<never>((_, reject) =>
+					setTimeout(
+						() => reject(new Error("Health check timed out")),
+						AUTH_STATUS_TIMEOUT_MS,
+					),
+				),
+			]);
+
+			if (isActive) {
+				return {
+					status: "active",
+					message: "Google session is active. Pomelli automation is ready.",
+					checkedAt,
+				};
+			}
+
+			return {
+				status: "expired",
+				message:
+					"Google session has expired. Please import fresh cookies via Settings to re-authenticate.",
+				checkedAt,
+			};
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			console.error(`[pomelli] Auth status check error: ${message}`);
+			return {
+				status: "error",
+				message: `Session check failed: ${message}`,
+				checkedAt,
+			};
+		}
 	}
 
 	// ─── Session check (FR-2) ───────────────────────────────────────────────

@@ -17,24 +17,13 @@ Build order follows the PRD's recommended MVP sequence: scaffolding → X postin
 - [x] Task 2: X (Twitter) posting service — `src/services/twitter.ts` with image upload, tweet posting, validation, usage tracking, and 25 unit tests (completed 2026-02-12)
 - [x] Task 3: Queue management API routes — `src/routes/api.ts` with 8 endpoints (ideas, queue, approve, edit, reject, history, settings GET/POST), wired into server.ts, 39 integration tests (completed 2026-02-12)
 - [x] Task 4: Pomelli browser automation service — `src/services/pomelli.ts` with PommelliService class, SELECTORS object, persistent browser context, session check, Business DNA creation, campaign generation, image download, caption extraction, DB integration, concurrency lock, debug screenshots, human-mimicking delays, and 24 unit tests (completed 2026-02-12)
+- [x] Task 5: Pomelli auth/session management — `importCookies()` method on PommelliService (validates, filters Google cookies, injects into Playwright context), `getAuthStatus()` with 10s timeout, `GET /api/auth/status` and `POST /api/auth/pomelli` API routes, `normalizeSameSite` helper, 27 tests in `tests/auth.test.ts` (completed 2026-02-12)
 
 ## In Progress
 
-- [ ] **[CURRENT]** Task 5: Pomelli auth/session management
+- [ ] **[CURRENT]** Task 6: Web dashboard — Layout and New Post page
 
 ## Backlog (Prioritized)
-
-5. [ ] Task 5: Pomelli auth/session management
-   - Why: Required for Pomelli service to work; separate due to complexity
-   - Details:
-     - `POST /api/auth/pomelli` — Trigger login flow (auth-session FR-3)
-     - `GET /api/auth/status` — Health check that navigates to Pomelli and confirms logged-in state, completes within 10s (auth-session FR-2, NFR-1)
-     - Implement cookie import flow — user pastes exported Google cookies, app injects into Playwright context (auth-session FR-4)
-     - Persistent browser context at `DATA_DIR/browser-state/` survives restarts (auth-session FR-1, FR-5)
-     - Clear error messaging when session is expired (auth-session FR-6)
-     - Never store Google credentials in plaintext (auth-session NFR-2)
-     - Write tests for health check and cookie import
-   - Spec: specs/auth-session.md
 
 6. [ ] Task 6: Web dashboard — Layout and New Post page
    - Why: First user-facing screen; enables submitting ideas into the pipeline

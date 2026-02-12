@@ -16,6 +16,11 @@ import {
 	setSetting,
 	updatePostStatus,
 } from "../db.ts";
+import {
+	getPommelliService,
+	type ImportedCookie,
+	PommelliError,
+} from "../services/pomelli.ts";
 import { postToX } from "../services/twitter.ts";
 
 const api = new Hono();
@@ -220,6 +225,72 @@ api.get("/history", (c) => {
 	}));
 
 	return c.json({ posts: enriched });
+});
+
+// ─── GET /api/auth/status — Session health check (auth-session FR-2) ──────
+
+api.get("/auth/status", async (c) => {
+	try {
+		const service = getPommelliService();
+		const authStatus = await service.getAuthStatus();
+
+		console.log(`[api] Auth status check: ${authStatus.status}`);
+		return c.json(authStatus);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`[api] Auth status check failed: ${message}`);
+		return c.json(
+			{
+				status: "error" as const,
+				message: `Failed to check auth status: ${message}`,
+				checkedAt: new Date().toISOString(),
+			},
+			500,
+		);
+	}
+});
+
+// ─── POST /api/auth/pomelli — Import cookies (auth-session FR-3, FR-4) ────
+
+api.post("/auth/pomelli", async (c) => {
+	const body = await c.req.json().catch(() => null);
+
+	if (!body || !Array.isArray(body.cookies)) {
+		return c.json(
+			{
+				error:
+					'Request must include a "cookies" array. Export cookies from your browser using a cookie manager extension while logged into Google.',
+			},
+			400,
+		);
+	}
+
+	const cookies = body.cookies as ImportedCookie[];
+
+	try {
+		const service = getPommelliService();
+		await service.importCookies(cookies);
+
+		// Verify the session is now active
+		const authStatus = await service.getAuthStatus();
+
+		console.log(`[api] Cookies imported, session status: ${authStatus.status}`);
+
+		return c.json({
+			success: true,
+			imported: cookies.length,
+			session: authStatus,
+		});
+	} catch (error) {
+		if (error instanceof PommelliError) {
+			console.warn(`[api] Cookie import failed: ${error.message}`);
+			return c.json({ error: error.message, code: error.code }, 400);
+		}
+
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`[api] Cookie import error: ${message}`);
+		return c.json({ error: `Cookie import failed: ${message}` }, 500);
+	}
 });
 
 // ─── POST /api/settings — Update settings (FR-8) ──────────────────────────
