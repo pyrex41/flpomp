@@ -20,20 +20,13 @@ Build order follows the PRD's recommended MVP sequence: scaffolding → X postin
 - [x] Task 5: Pomelli auth/session management — `importCookies()` method on PommelliService (validates, filters Google cookies, injects into Playwright context), `getAuthStatus()` with 10s timeout, `GET /api/auth/status` and `POST /api/auth/pomelli` API routes, `normalizeSameSite` helper, 27 tests in `tests/auth.test.ts` (completed 2026-02-12)
 - [x] Task 6: Web dashboard — Layout and New Post page — `src/views/pages/dashboard.tsx` (NewPostPage, IdeaSubmitResult, IdeaSubmitError, RecentPostsList components), `src/routes/pages.tsx` (HTMX form handler POST /submit-idea, polling partial GET /partials/recent, stub pages for /queue, /history, /settings), enhanced `src/views/layout.tsx` (HTMX indicator styles, status badges, post card styles, Pico CSS + HTMX CDN), improved `getAllPosts` ordering (id DESC tiebreaker), 25 tests in `tests/pages.test.ts` (completed 2026-02-12)
 - [x] Task 7: Web dashboard — Queue page — `src/views/components/post-card.tsx` (PostCard with Approve/Edit/Reject buttons, PostCardEditForm with inline caption editing), `src/views/pages/queue.tsx` (QueuePage, QueueList), updated `src/routes/pages.tsx` (GET /queue full page, POST approve/reject/edit HTMX actions, GET /partials/queue-card/:id and /edit endpoints, GET /partials/queue list partial), queue card CSS transitions in layout.tsx, 38 new tests covering queue listing, approve, reject, edit with validation, card partials (completed 2026-02-12)
+- [x] Task 8: Web dashboard — History and Settings pages — `src/views/pages/history.tsx` (HistoryPage, HistoryList, HistoryCard with tweet links, image thumbnails, timestamps, 30s HTMX polling), `src/views/pages/settings.tsx` (SettingsPage with website URL form for Business DNA, SettingsSaveResult/Error, SessionStatusPartial with authenticated/unauthenticated/error states), updated `src/routes/pages.tsx` (GET /history, GET /settings with saved URL, POST /settings with URL validation, GET /partials/history, GET /partials/session-status with Pomelli auth status mapping), history card + session status CSS in layout.tsx, 30 new tests in pages.test.ts (completed 2026-02-12)
 
 ## In Progress
 
-- [ ] **[CURRENT]** Task 8: Web dashboard — History and Settings pages
+- [ ] **[CURRENT]** Task 9: End-to-end integration — Idea → Pomelli → Queue → Approve → X
 
 ## Backlog (Prioritized)
-
-8. [ ] Task 8: Web dashboard — History and Settings pages
-   - Why: Completes the dashboard UI
-   - Details:
-     - Create `src/views/pages/history.tsx` — posted content with tweet links + timestamps (dashboard FR-4)
-     - Create `src/views/pages/settings.tsx` — website URL for Business DNA, session status display (dashboard FR-5)
-     - Settings form saves via `hx-post="/api/settings"` (dashboard FR-7)
-   - Spec: specs/dashboard.md
 
 9. [ ] Task 9: End-to-end integration — Idea → Pomelli → Queue → Approve → X
    - Why: Wires all services together into the complete flywheel

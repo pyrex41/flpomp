@@ -93,13 +93,37 @@ export function Layout({ title, children }: LayoutProps) {
 						opacity: 0;
 					}
 
-					/* ── Utility ────────────────────────────────────── */
-					.secondary {
-						color: var(--pico-muted-color);
-					}
-					hr {
-						margin: 2rem 0;
-					}
+				/* ── History cards ──────────────────────────────── */
+				.history-card a {
+					font-weight: 600;
+				}
+
+				/* ── Settings page ─────────────────────────────── */
+				.settings-success {
+					color: var(--pico-ins-color);
+					font-weight: 600;
+				}
+				.session-status {
+					padding: 1rem;
+					border-radius: 8px;
+				}
+				.session-authenticated {
+					border-left: 4px solid #059669;
+				}
+				.session-unauthenticated {
+					border-left: 4px solid #d97706;
+				}
+				.session-error {
+					border-left: 4px solid #dc2626;
+				}
+
+				/* ── Utility ────────────────────────────────────── */
+				.secondary {
+					color: var(--pico-muted-color);
+				}
+				hr {
+					margin: 2rem 0;
+				}
 				`}</style>
 			</head>
 			<body>

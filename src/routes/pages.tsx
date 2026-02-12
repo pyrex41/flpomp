@@ -13,8 +13,11 @@ import {
 	getAllPosts,
 	getDb,
 	getPostById,
+	getSetting,
+	setSetting,
 	updatePostStatus,
 } from "../db.ts";
+import { getPommelliService } from "../services/pomelli.ts";
 import { PostCard, PostCardEditForm } from "../views/components/post-card.tsx";
 import { Layout } from "../views/layout.tsx";
 import {
@@ -23,7 +26,14 @@ import {
 	NewPostPage,
 	RecentPostsList,
 } from "../views/pages/dashboard.tsx";
+import { HistoryList, HistoryPage } from "../views/pages/history.tsx";
 import { QueueList, QueuePage } from "../views/pages/queue.tsx";
+import {
+	SessionStatusPartial,
+	SettingsPage,
+	SettingsSaveError,
+	SettingsSaveResult,
+} from "../views/pages/settings.tsx";
 
 const pages = new Hono();
 
@@ -214,32 +224,99 @@ pages.get("/partials/queue", (c) => {
 	return c.html(<QueueList posts={posts} />);
 });
 
-// ─── History page (stub — Task 8) ──────────────────────────────────────────
+// ─── History page ────────────────────────────────────────────────────────────
 
 pages.get("/history", (c) => {
+	const posts = getAllPosts(db(), "posted");
 	return c.html(
 		<Layout title="History">
-			<hgroup>
-				<h2>History</h2>
-				<p>Posts that have been published to X.</p>
-			</hgroup>
-			<p class="secondary">Post history coming in the next update.</p>
+			<HistoryPage posts={posts} />
 		</Layout>,
 	);
 });
 
-// ─── Settings page (stub — Task 8) ─────────────────────────────────────────
+// ─── History partial (HTMX polling target) ──────────────────────────────────
+
+pages.get("/partials/history", (c) => {
+	const posts = getAllPosts(db(), "posted");
+	return c.html(<HistoryList posts={posts} />);
+});
+
+// ─── Settings page ──────────────────────────────────────────────────────────
 
 pages.get("/settings", (c) => {
+	const websiteUrl = getSetting(db(), "website_url") ?? "";
 	return c.html(
 		<Layout title="Settings">
-			<hgroup>
-				<h2>Settings</h2>
-				<p>Configure the flywheel.</p>
-			</hgroup>
-			<p class="secondary">Settings page coming in the next update.</p>
+			<SettingsPage websiteUrl={websiteUrl} />
 		</Layout>,
 	);
+});
+
+// ─── Settings form handler (HTMX) ──────────────────────────────────────────
+
+pages.post("/settings", async (c) => {
+	const body = await c.req.parseBody();
+	const websiteUrl =
+		typeof body.website_url === "string" ? body.website_url.trim() : "";
+
+	if (!websiteUrl) {
+		return c.html(
+			<SettingsSaveError message="Website URL is required." />,
+			400,
+		);
+	}
+
+	// Basic URL validation
+	try {
+		new URL(websiteUrl);
+	} catch {
+		return c.html(
+			<SettingsSaveError message="Please enter a valid URL (e.g. https://example.com)." />,
+			400,
+		);
+	}
+
+	setSetting(db(), "website_url", websiteUrl);
+	console.log(`[pages] Settings updated: website_url = ${websiteUrl}`);
+
+	return c.html(<SettingsSaveResult websiteUrl={websiteUrl} />);
+});
+
+// ─── Session status partial (loaded on settings page) ───────────────────────
+
+pages.get("/partials/session-status", async (c) => {
+	try {
+		const service = getPommelliService();
+		const authStatus = await service.getAuthStatus();
+
+		console.log(`[pages] Session status check: ${authStatus.status}`);
+
+		// Map Pomelli auth status to display status
+		const displayStatus =
+			authStatus.status === "active"
+				? "authenticated"
+				: authStatus.status === "error"
+					? "error"
+					: "unauthenticated";
+
+		return c.html(
+			<SessionStatusPartial
+				status={displayStatus}
+				message={authStatus.message}
+			/>,
+		);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`[pages] Session status check failed: ${message}`);
+
+		return c.html(
+			<SessionStatusPartial
+				status="error"
+				message={`Could not check session: ${message}`}
+			/>,
+		);
+	}
 });
 
 export { pages };

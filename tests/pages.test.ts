@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPost, createTestDb, updatePostStatus } from "../src/db.ts";
+import {
+	createPost,
+	createTestDb,
+	getSetting,
+	setSetting,
+	updatePostStatus,
+} from "../src/db.ts";
 import { setPageTestDb } from "../src/routes/pages.tsx";
 import { app } from "../src/server.ts";
 
@@ -20,6 +26,27 @@ vi.mock("../src/services/twitter.ts", () => ({
 			super(message);
 			this.code = code;
 			this.name = "TwitterPostError";
+		}
+	},
+}));
+
+// Mock the Pomelli service (used by settings page session status)
+const mockGetAuthStatus = vi.fn().mockResolvedValue({
+	status: "active",
+	message: "Authenticated with Google",
+	checkedAt: new Date().toISOString(),
+});
+
+vi.mock("../src/services/pomelli.ts", () => ({
+	getPommelliService: vi.fn(() => ({
+		getAuthStatus: mockGetAuthStatus,
+	})),
+	PommelliError: class extends Error {
+		code: string;
+		constructor(message: string, code: string) {
+			super(message);
+			this.code = code;
+			this.name = "PommelliError";
 		}
 	},
 }));
@@ -706,7 +733,7 @@ describe("page routes", () => {
 		});
 	});
 
-	// ─── Stub pages ──────────────────────────────────────────────────────
+	// ─── History page ────────────────────────────────────────────────────
 
 	describe("GET /history", () => {
 		it("should return 200 with history page", async () => {
@@ -717,7 +744,160 @@ describe("page routes", () => {
 			expect(html).toContain("History");
 			expect(html).toContain("Pomelli Flywheel");
 		});
+
+		it("should show empty state when no posted content", async () => {
+			const res = await app.request("/history");
+			const html = await res.text();
+
+			expect(html).toContain("No posts published yet");
+			expect(html).toContain('href="/queue"');
+		});
+
+		it("should list posted posts with tweet links", async () => {
+			const post = createPost(db, "Published idea");
+			updatePostStatus(db, post.id, "posted", {
+				pomelli_caption: "Amazing caption",
+				pomelli_image_path: "/data/assets/pub-image.png",
+				x_post_id: "tweet-123",
+				x_post_url: "https://x.com/i/status/tweet-123",
+				posted_at: "2026-02-12 10:00:00",
+			});
+
+			const res = await app.request("/history");
+			const html = await res.text();
+
+			expect(html).toContain("Published idea");
+			expect(html).toContain("Amazing caption");
+			expect(html).toContain("https://x.com/i/status/tweet-123");
+			expect(html).toContain("View on X");
+			expect(html).toContain("Posted");
+		});
+
+		it("should show post count", async () => {
+			const p1 = createPost(db, "Post 1");
+			const p2 = createPost(db, "Post 2");
+			updatePostStatus(db, p1.id, "posted", { posted_at: "2026-02-12" });
+			updatePostStatus(db, p2.id, "posted", { posted_at: "2026-02-12" });
+
+			const res = await app.request("/history");
+			const html = await res.text();
+
+			expect(html).toContain("2 posts published");
+		});
+
+		it("should show singular post count", async () => {
+			const p = createPost(db, "Solo post");
+			updatePostStatus(db, p.id, "posted", { posted_at: "2026-02-12" });
+
+			const res = await app.request("/history");
+			const html = await res.text();
+
+			expect(html).toContain("1 post published");
+		});
+
+		it("should not show posts with non-posted statuses", async () => {
+			createPost(db, "Generating idea"); // status: generating
+			const approved = createPost(db, "Approved idea");
+			updatePostStatus(db, approved.id, "approved");
+
+			const res = await app.request("/history");
+			const html = await res.text();
+
+			expect(html).not.toContain("Generating idea");
+			expect(html).not.toContain("Approved idea");
+			expect(html).toContain("No posts published yet");
+		});
+
+		it("should show image thumbnails when available", async () => {
+			const post = createPost(db, "Image history test");
+			updatePostStatus(db, post.id, "posted", {
+				pomelli_image_path: "/data/assets/history-img.png",
+				posted_at: "2026-02-12",
+			});
+
+			const res = await app.request("/history");
+			const html = await res.text();
+
+			expect(html).toContain("/assets/history-img.png");
+			expect(html).toContain("<img");
+		});
+
+		it("should show edited caption over original", async () => {
+			const post = createPost(db, "Caption priority");
+			updatePostStatus(db, post.id, "posted", {
+				pomelli_caption: "Original",
+				edited_caption: "Edited version",
+				posted_at: "2026-02-12",
+			});
+
+			const res = await app.request("/history");
+			const html = await res.text();
+
+			expect(html).toContain("Edited version");
+		});
+
+		it("should show timestamps", async () => {
+			const post = createPost(db, "Timestamp test");
+			updatePostStatus(db, post.id, "posted", {
+				posted_at: "2026-02-12 10:30:00",
+			});
+
+			const res = await app.request("/history");
+			const html = await res.text();
+
+			expect(html).toContain("Posted: 2026-02-12 10:30:00");
+		});
+
+		it("should include HTMX polling for auto-refresh", async () => {
+			const res = await app.request("/history");
+			const html = await res.text();
+
+			expect(html).toContain('hx-get="/partials/history"');
+			expect(html).toContain("every 30s");
+		});
 	});
+
+	// ─── History partial ─────────────────────────────────────────────────
+
+	describe("GET /partials/history", () => {
+		it("should return HTML partial without full layout", async () => {
+			const res = await app.request("/partials/history");
+			expect(res.status).toBe(200);
+
+			const html = await res.text();
+			expect(html).not.toContain("<html");
+			expect(html).toContain("No posts published yet");
+		});
+
+		it("should list posted posts", async () => {
+			const post = createPost(db, "Partial test");
+			updatePostStatus(db, post.id, "posted", {
+				pomelli_caption: "Caption here",
+				posted_at: "2026-02-12",
+			});
+
+			const res = await app.request("/partials/history");
+			const html = await res.text();
+
+			expect(html).toContain("Partial test");
+			expect(html).toContain("Caption here");
+		});
+
+		it("should only include posted posts", async () => {
+			const p1 = createPost(db, "Posted idea");
+			updatePostStatus(db, p1.id, "posted", { posted_at: "2026-02-12" });
+			const p2 = createPost(db, "Pending idea");
+			updatePostStatus(db, p2.id, "pending_review");
+
+			const res = await app.request("/partials/history");
+			const html = await res.text();
+
+			expect(html).toContain("Posted idea");
+			expect(html).not.toContain("Pending idea");
+		});
+	});
+
+	// ─── Settings page ──────────────────────────────────────────────────
 
 	describe("GET /settings", () => {
 		it("should return 200 with settings page", async () => {
@@ -727,6 +907,208 @@ describe("page routes", () => {
 			const html = await res.text();
 			expect(html).toContain("Settings");
 			expect(html).toContain("Pomelli Flywheel");
+		});
+
+		it("should include website URL form", async () => {
+			const res = await app.request("/settings");
+			const html = await res.text();
+
+			expect(html).toContain('name="website_url"');
+			expect(html).toContain('hx-post="/settings"');
+			expect(html).toContain("Save Settings");
+		});
+
+		it("should show saved website URL", async () => {
+			setSetting(db, "website_url", "https://mycafe.com");
+
+			const res = await app.request("/settings");
+			const html = await res.text();
+
+			expect(html).toContain("https://mycafe.com");
+		});
+
+		it("should show empty value when no URL saved", async () => {
+			const res = await app.request("/settings");
+			const html = await res.text();
+
+			expect(html).toContain('value=""');
+		});
+
+		it("should include session status section", async () => {
+			const res = await app.request("/settings");
+			const html = await res.text();
+
+			expect(html).toContain("Pomelli Session");
+			expect(html).toContain('hx-get="/partials/session-status"');
+		});
+
+		it("should include Business DNA explanation", async () => {
+			const res = await app.request("/settings");
+			const html = await res.text();
+
+			expect(html).toContain("Business DNA");
+		});
+	});
+
+	// ─── Settings form submission ────────────────────────────────────────
+
+	describe("POST /settings", () => {
+		it("should save website URL and return confirmation", async () => {
+			const form = new FormData();
+			form.append("website_url", "https://mybrand.com");
+
+			const res = await app.request("/settings", {
+				method: "POST",
+				body: form,
+			});
+
+			expect(res.status).toBe(200);
+			const html = await res.text();
+			expect(html).toContain("Settings saved");
+			expect(html).toContain("https://mybrand.com");
+
+			// Verify persisted in DB
+			const saved = getSetting(db, "website_url");
+			expect(saved).toBe("https://mybrand.com");
+		});
+
+		it("should return 400 for empty URL", async () => {
+			const form = new FormData();
+			form.append("website_url", "  ");
+
+			const res = await app.request("/settings", {
+				method: "POST",
+				body: form,
+			});
+
+			expect(res.status).toBe(400);
+			const html = await res.text();
+			expect(html).toContain("required");
+		});
+
+		it("should return 400 for missing URL field", async () => {
+			const form = new FormData();
+
+			const res = await app.request("/settings", {
+				method: "POST",
+				body: form,
+			});
+
+			expect(res.status).toBe(400);
+			const html = await res.text();
+			expect(html).toContain("required");
+		});
+
+		it("should return 400 for invalid URL", async () => {
+			const form = new FormData();
+			form.append("website_url", "not-a-valid-url");
+
+			const res = await app.request("/settings", {
+				method: "POST",
+				body: form,
+			});
+
+			expect(res.status).toBe(400);
+			const html = await res.text();
+			expect(html).toContain("valid URL");
+		});
+
+		it("should trim whitespace from URL", async () => {
+			const form = new FormData();
+			form.append("website_url", "  https://trimmed.com  ");
+
+			const res = await app.request("/settings", {
+				method: "POST",
+				body: form,
+			});
+
+			expect(res.status).toBe(200);
+			const saved = getSetting(db, "website_url");
+			expect(saved).toBe("https://trimmed.com");
+		});
+
+		it("should overwrite existing URL", async () => {
+			setSetting(db, "website_url", "https://old.com");
+
+			const form = new FormData();
+			form.append("website_url", "https://new.com");
+
+			const res = await app.request("/settings", {
+				method: "POST",
+				body: form,
+			});
+
+			expect(res.status).toBe(200);
+			const saved = getSetting(db, "website_url");
+			expect(saved).toBe("https://new.com");
+		});
+	});
+
+	// ─── Session status partial ──────────────────────────────────────────
+
+	describe("GET /partials/session-status", () => {
+		it("should show authenticated status when session is active", async () => {
+			mockGetAuthStatus.mockResolvedValueOnce({
+				status: "active",
+				message: "Authenticated with Google",
+				checkedAt: new Date().toISOString(),
+			});
+
+			const res = await app.request("/partials/session-status");
+			expect(res.status).toBe(200);
+
+			const html = await res.text();
+			expect(html).toContain("Session Active");
+			expect(html).toContain("Authenticated with Google");
+		});
+
+		it("should show unauthenticated status when session is expired", async () => {
+			mockGetAuthStatus.mockResolvedValueOnce({
+				status: "expired",
+				message: "Session has expired",
+				checkedAt: new Date().toISOString(),
+			});
+
+			const res = await app.request("/partials/session-status");
+			expect(res.status).toBe(200);
+
+			const html = await res.text();
+			expect(html).toContain("Session Inactive");
+			expect(html).toContain("Session has expired");
+		});
+
+		it("should show unauthenticated for unknown status", async () => {
+			mockGetAuthStatus.mockResolvedValueOnce({
+				status: "unknown",
+				message: "No session found",
+				checkedAt: new Date().toISOString(),
+			});
+
+			const res = await app.request("/partials/session-status");
+			expect(res.status).toBe(200);
+
+			const html = await res.text();
+			expect(html).toContain("Session Inactive");
+		});
+
+		it("should show error status when auth check fails", async () => {
+			mockGetAuthStatus.mockRejectedValueOnce(
+				new Error("Browser not available"),
+			);
+
+			const res = await app.request("/partials/session-status");
+			expect(res.status).toBe(200);
+
+			const html = await res.text();
+			expect(html).toContain("Session Check Failed");
+			expect(html).toContain("Browser not available");
+		});
+
+		it("should return HTML partial without full layout", async () => {
+			const res = await app.request("/partials/session-status");
+
+			const html = await res.text();
+			expect(html).not.toContain("<html");
 		});
 	});
 });
