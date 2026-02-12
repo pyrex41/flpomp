@@ -19,22 +19,13 @@ Build order follows the PRD's recommended MVP sequence: scaffolding → X postin
 - [x] Task 4: Pomelli browser automation service — `src/services/pomelli.ts` with PommelliService class, SELECTORS object, persistent browser context, session check, Business DNA creation, campaign generation, image download, caption extraction, DB integration, concurrency lock, debug screenshots, human-mimicking delays, and 24 unit tests (completed 2026-02-12)
 - [x] Task 5: Pomelli auth/session management — `importCookies()` method on PommelliService (validates, filters Google cookies, injects into Playwright context), `getAuthStatus()` with 10s timeout, `GET /api/auth/status` and `POST /api/auth/pomelli` API routes, `normalizeSameSite` helper, 27 tests in `tests/auth.test.ts` (completed 2026-02-12)
 - [x] Task 6: Web dashboard — Layout and New Post page — `src/views/pages/dashboard.tsx` (NewPostPage, IdeaSubmitResult, IdeaSubmitError, RecentPostsList components), `src/routes/pages.tsx` (HTMX form handler POST /submit-idea, polling partial GET /partials/recent, stub pages for /queue, /history, /settings), enhanced `src/views/layout.tsx` (HTMX indicator styles, status badges, post card styles, Pico CSS + HTMX CDN), improved `getAllPosts` ordering (id DESC tiebreaker), 25 tests in `tests/pages.test.ts` (completed 2026-02-12)
+- [x] Task 7: Web dashboard — Queue page — `src/views/components/post-card.tsx` (PostCard with Approve/Edit/Reject buttons, PostCardEditForm with inline caption editing), `src/views/pages/queue.tsx` (QueuePage, QueueList), updated `src/routes/pages.tsx` (GET /queue full page, POST approve/reject/edit HTMX actions, GET /partials/queue-card/:id and /edit endpoints, GET /partials/queue list partial), queue card CSS transitions in layout.tsx, 38 new tests covering queue listing, approve, reject, edit with validation, card partials (completed 2026-02-12)
 
 ## In Progress
 
-- [ ] **[CURRENT]** Task 7: Web dashboard — Queue page
+- [ ] **[CURRENT]** Task 8: Web dashboard — History and Settings pages
 
 ## Backlog (Prioritized)
-
-7. [ ] Task 7: Web dashboard — Queue page
-   - Why: Human-in-the-loop approval is the core UX
-   - Details:
-     - Create `src/views/pages/queue.tsx` (dashboard FR-2)
-     - List pending posts with image thumbnail + caption text + Approve / Edit / Reject buttons
-     - Inline edit: click Edit to modify caption before approving (dashboard FR-3, HTMX inline edit)
-     - HTMX partial updates — approve/reject removes item from list (dashboard FR-7)
-     - Create `src/views/components/post-card.tsx` — reusable post card partial
-   - Spec: specs/dashboard.md
 
 8. [ ] Task 8: Web dashboard — History and Settings pages
    - Why: Completes the dashboard UI

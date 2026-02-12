@@ -85,6 +85,14 @@ export function Layout({ title, children }: LayoutProps) {
 						font-weight: 600;
 					}
 
+					/* ── Queue cards ───────────────────────────────── */
+					.queue-card {
+						transition: opacity 300ms ease-out;
+					}
+					.queue-card.htmx-swapping {
+						opacity: 0;
+					}
+
 					/* ── Utility ────────────────────────────────────── */
 					.secondary {
 						color: var(--pico-muted-color);

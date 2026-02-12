@@ -306,7 +306,7 @@ describe("page routes", () => {
 		});
 	});
 
-	// ─── Stub pages ──────────────────────────────────────────────────────
+	// ─── Queue page ──────────────────────────────────────────────────────
 
 	describe("GET /queue", () => {
 		it("should return 200 with queue page", async () => {
@@ -317,7 +317,396 @@ describe("page routes", () => {
 			expect(html).toContain("Queue");
 			expect(html).toContain("Pomelli Flywheel");
 		});
+
+		it("should show empty state when no posts pending review", async () => {
+			const res = await app.request("/queue");
+			const html = await res.text();
+
+			expect(html).toContain("No posts pending review");
+			expect(html).toContain('href="/"');
+		});
+
+		it("should list pending_review posts with action buttons", async () => {
+			const post = createPost(db, "Queue test idea");
+			updatePostStatus(db, post.id, "pending_review", {
+				pomelli_caption: "A great caption",
+				pomelli_image_path: "/data/assets/test-image.png",
+			});
+
+			const res = await app.request("/queue");
+			const html = await res.text();
+
+			expect(html).toContain("Queue test idea");
+			expect(html).toContain("A great caption");
+			expect(html).toContain("Approve");
+			expect(html).toContain("Edit");
+			expect(html).toContain("Reject");
+		});
+
+		it("should show post count", async () => {
+			const p1 = createPost(db, "Idea 1");
+			const p2 = createPost(db, "Idea 2");
+			updatePostStatus(db, p1.id, "pending_review");
+			updatePostStatus(db, p2.id, "pending_review");
+
+			const res = await app.request("/queue");
+			const html = await res.text();
+
+			expect(html).toContain("2 posts pending review");
+		});
+
+		it("should show singular post count", async () => {
+			const p = createPost(db, "Solo idea");
+			updatePostStatus(db, p.id, "pending_review");
+
+			const res = await app.request("/queue");
+			const html = await res.text();
+
+			expect(html).toContain("1 post pending review");
+		});
+
+		it("should not show posts with other statuses", async () => {
+			createPost(db, "Generating idea"); // status: generating
+			const approved = createPost(db, "Approved idea");
+			updatePostStatus(db, approved.id, "approved");
+
+			const res = await app.request("/queue");
+			const html = await res.text();
+
+			expect(html).not.toContain("Generating idea");
+			expect(html).not.toContain("Approved idea");
+			expect(html).toContain("No posts pending review");
+		});
+
+		it("should include HTMX attributes on action buttons", async () => {
+			const post = createPost(db, "HTMX test");
+			updatePostStatus(db, post.id, "pending_review");
+
+			const res = await app.request("/queue");
+			const html = await res.text();
+
+			expect(html).toContain(`hx-post="/queue/${post.id}/approve"`);
+			expect(html).toContain(`hx-post="/queue/${post.id}/reject"`);
+			expect(html).toContain(`hx-get="/partials/queue-card/${post.id}/edit"`);
+			expect(html).toContain(`hx-swap="outerHTML"`);
+		});
+
+		it("should show image thumbnail when available", async () => {
+			const post = createPost(db, "Image test");
+			updatePostStatus(db, post.id, "pending_review", {
+				pomelli_image_path: "/data/assets/my-image.png",
+			});
+
+			const res = await app.request("/queue");
+			const html = await res.text();
+
+			expect(html).toContain("/assets/my-image.png");
+			expect(html).toContain("<img");
+		});
+
+		it("should show edited caption over original", async () => {
+			const post = createPost(db, "Caption priority test");
+			updatePostStatus(db, post.id, "pending_review", {
+				pomelli_caption: "Original caption",
+				edited_caption: "Edited caption",
+			});
+
+			const res = await app.request("/queue");
+			const html = await res.text();
+
+			expect(html).toContain("Edited caption");
+		});
+
+		it("should include reject confirmation prompt", async () => {
+			const post = createPost(db, "Confirm test");
+			updatePostStatus(db, post.id, "pending_review");
+
+			const res = await app.request("/queue");
+			const html = await res.text();
+
+			expect(html).toContain("hx-confirm");
+		});
 	});
+
+	// ─── Queue approve action ────────────────────────────────────────────
+
+	describe("POST /queue/:id/approve", () => {
+		it("should approve a pending_review post and return empty HTML", async () => {
+			const post = createPost(db, "Approve me");
+			updatePostStatus(db, post.id, "pending_review");
+
+			const res = await app.request(`/queue/${post.id}/approve`, {
+				method: "POST",
+			});
+
+			expect(res.status).toBe(200);
+			const html = await res.text();
+			// Response should be minimal (just a comment for outerHTML removal)
+			expect(html).toContain("approved");
+
+			// Verify DB status changed
+			const updated = db
+				.query("SELECT status FROM posts WHERE id = ?")
+				.get(post.id) as { status: string };
+			expect(updated.status).toBe("approved");
+		});
+
+		it("should return 404 for non-existent post", async () => {
+			const res = await app.request("/queue/999/approve", {
+				method: "POST",
+			});
+			expect(res.status).toBe(404);
+		});
+
+		it("should return 400 for invalid ID", async () => {
+			const res = await app.request("/queue/abc/approve", {
+				method: "POST",
+			});
+			expect(res.status).toBe(400);
+		});
+
+		it("should return 409 for non-pending_review post", async () => {
+			const post = createPost(db, "Already approved");
+			updatePostStatus(db, post.id, "approved");
+
+			const res = await app.request(`/queue/${post.id}/approve`, {
+				method: "POST",
+			});
+			expect(res.status).toBe(409);
+		});
+	});
+
+	// ─── Queue reject action ─────────────────────────────────────────────
+
+	describe("POST /queue/:id/reject", () => {
+		it("should reject a pending_review post and return empty HTML", async () => {
+			const post = createPost(db, "Reject me");
+			updatePostStatus(db, post.id, "pending_review");
+
+			const res = await app.request(`/queue/${post.id}/reject`, {
+				method: "POST",
+			});
+
+			expect(res.status).toBe(200);
+			const html = await res.text();
+			expect(html).toContain("rejected");
+
+			const updated = db
+				.query("SELECT status FROM posts WHERE id = ?")
+				.get(post.id) as { status: string };
+			expect(updated.status).toBe("rejected");
+		});
+
+		it("should return 404 for non-existent post", async () => {
+			const res = await app.request("/queue/999/reject", {
+				method: "POST",
+			});
+			expect(res.status).toBe(404);
+		});
+
+		it("should return 409 for non-pending_review post", async () => {
+			const post = createPost(db, "Posted already");
+			updatePostStatus(db, post.id, "posted");
+
+			const res = await app.request(`/queue/${post.id}/reject`, {
+				method: "POST",
+			});
+			expect(res.status).toBe(409);
+		});
+	});
+
+	// ─── Queue edit action ───────────────────────────────────────────────
+
+	describe("POST /queue/:id/edit", () => {
+		it("should update caption and return updated PostCard", async () => {
+			const post = createPost(db, "Edit me");
+			updatePostStatus(db, post.id, "pending_review", {
+				pomelli_caption: "Original",
+			});
+
+			const form = new FormData();
+			form.append("caption", "Updated caption");
+
+			const res = await app.request(`/queue/${post.id}/edit`, {
+				method: "POST",
+				body: form,
+			});
+
+			expect(res.status).toBe(200);
+			const html = await res.text();
+			expect(html).toContain("Updated caption");
+			expect(html).toContain("Approve");
+
+			const updated = db
+				.query("SELECT edited_caption FROM posts WHERE id = ?")
+				.get(post.id) as { edited_caption: string };
+			expect(updated.edited_caption).toBe("Updated caption");
+		});
+
+		it("should return 400 for empty caption", async () => {
+			const post = createPost(db, "Empty caption test");
+			updatePostStatus(db, post.id, "pending_review");
+
+			const form = new FormData();
+			form.append("caption", "   ");
+
+			const res = await app.request(`/queue/${post.id}/edit`, {
+				method: "POST",
+				body: form,
+			});
+
+			expect(res.status).toBe(400);
+			const html = await res.text();
+			expect(html).toContain("Caption cannot be empty");
+		});
+
+		it("should return 400 for caption over 280 characters", async () => {
+			const post = createPost(db, "Long caption test");
+			updatePostStatus(db, post.id, "pending_review");
+
+			const form = new FormData();
+			form.append("caption", "x".repeat(281));
+
+			const res = await app.request(`/queue/${post.id}/edit`, {
+				method: "POST",
+				body: form,
+			});
+
+			expect(res.status).toBe(400);
+			const html = await res.text();
+			expect(html).toContain("max 280");
+		});
+
+		it("should return 404 for non-existent post", async () => {
+			const form = new FormData();
+			form.append("caption", "Test");
+
+			const res = await app.request("/queue/999/edit", {
+				method: "POST",
+				body: form,
+			});
+			expect(res.status).toBe(404);
+		});
+
+		it("should return 409 for non-pending_review post", async () => {
+			const post = createPost(db, "Wrong status");
+			updatePostStatus(db, post.id, "approved");
+
+			const form = new FormData();
+			form.append("caption", "Test");
+
+			const res = await app.request(`/queue/${post.id}/edit`, {
+				method: "POST",
+				body: form,
+			});
+			expect(res.status).toBe(409);
+		});
+
+		it("should trim whitespace from caption", async () => {
+			const post = createPost(db, "Trim test");
+			updatePostStatus(db, post.id, "pending_review");
+
+			const form = new FormData();
+			form.append("caption", "  trimmed caption  ");
+
+			const res = await app.request(`/queue/${post.id}/edit`, {
+				method: "POST",
+				body: form,
+			});
+
+			expect(res.status).toBe(200);
+
+			const updated = db
+				.query("SELECT edited_caption FROM posts WHERE id = ?")
+				.get(post.id) as { edited_caption: string };
+			expect(updated.edited_caption).toBe("trimmed caption");
+		});
+	});
+
+	// ─── Queue card partials ─────────────────────────────────────────────
+
+	describe("GET /partials/queue-card/:id/edit", () => {
+		it("should return edit form for a post", async () => {
+			const post = createPost(db, "Edit form test");
+			updatePostStatus(db, post.id, "pending_review", {
+				pomelli_caption: "Current caption",
+			});
+
+			const res = await app.request(`/partials/queue-card/${post.id}/edit`);
+
+			expect(res.status).toBe(200);
+			const html = await res.text();
+			expect(html).toContain("Current caption");
+			expect(html).toContain("Save Caption");
+			expect(html).toContain("Cancel");
+			expect(html).toContain("textarea");
+			expect(html).toContain(`hx-post="/queue/${post.id}/edit"`);
+		});
+
+		it("should return 404 for non-existent post", async () => {
+			const res = await app.request("/partials/queue-card/999/edit");
+			expect(res.status).toBe(404);
+		});
+	});
+
+	describe("GET /partials/queue-card/:id", () => {
+		it("should return a PostCard for the given post", async () => {
+			const post = createPost(db, "Card partial test");
+			updatePostStatus(db, post.id, "pending_review", {
+				pomelli_caption: "Caption here",
+			});
+
+			const res = await app.request(`/partials/queue-card/${post.id}`);
+
+			expect(res.status).toBe(200);
+			const html = await res.text();
+			expect(html).toContain("Card partial test");
+			expect(html).toContain("Caption here");
+			expect(html).toContain("Approve");
+			expect(html).not.toContain("<html");
+		});
+
+		it("should return 404 for non-existent post", async () => {
+			const res = await app.request("/partials/queue-card/999");
+			expect(res.status).toBe(404);
+		});
+	});
+
+	describe("GET /partials/queue", () => {
+		it("should return queue list partial without layout", async () => {
+			const post = createPost(db, "Queue partial test");
+			updatePostStatus(db, post.id, "pending_review");
+
+			const res = await app.request("/partials/queue");
+
+			expect(res.status).toBe(200);
+			const html = await res.text();
+			expect(html).toContain("Queue partial test");
+			expect(html).not.toContain("<html");
+		});
+
+		it("should show empty state when queue is empty", async () => {
+			const res = await app.request("/partials/queue");
+			const html = await res.text();
+
+			expect(html).toContain("No posts pending review");
+		});
+
+		it("should only include pending_review posts", async () => {
+			const p1 = createPost(db, "Pending idea");
+			updatePostStatus(db, p1.id, "pending_review");
+			const p2 = createPost(db, "Approved idea");
+			updatePostStatus(db, p2.id, "approved");
+
+			const res = await app.request("/partials/queue");
+			const html = await res.text();
+
+			expect(html).toContain("Pending idea");
+			expect(html).not.toContain("Approved idea");
+		});
+	});
+
+	// ─── Stub pages ──────────────────────────────────────────────────────
 
 	describe("GET /history", () => {
 		it("should return 200 with history page", async () => {
