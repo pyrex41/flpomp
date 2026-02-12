@@ -16,48 +16,13 @@ Build order follows the PRD's recommended MVP sequence: scaffolding → X postin
 - [x] Task 1: Project scaffolding — Bun + Hono + TypeScript + HTMX + SQLite setup (completed 2026-02-12)
 - [x] Task 2: X (Twitter) posting service — `src/services/twitter.ts` with image upload, tweet posting, validation, usage tracking, and 25 unit tests (completed 2026-02-12)
 - [x] Task 3: Queue management API routes — `src/routes/api.ts` with 8 endpoints (ideas, queue, approve, edit, reject, history, settings GET/POST), wired into server.ts, 39 integration tests (completed 2026-02-12)
+- [x] Task 4: Pomelli browser automation service — `src/services/pomelli.ts` with PommelliService class, SELECTORS object, persistent browser context, session check, Business DNA creation, campaign generation, image download, caption extraction, DB integration, concurrency lock, debug screenshots, human-mimicking delays, and 24 unit tests (completed 2026-02-12)
 
 ## In Progress
 
-- [ ] **[CURRENT]** Task 4: Pomelli browser automation service
+- [ ] **[CURRENT]** Task 5: Pomelli auth/session management
 
 ## Backlog (Prioritized)
-
-4. [ ] Task 4: Pomelli browser automation service
-   - Why: Provides the REST backbone that both Pomelli service and dashboard will use
-   - Details:
-     - Create `src/routes/api.ts` — Hono router with JSON API endpoints (queue-management NFR-2)
-     - `POST /api/ideas` — Accept idea, validate non-empty (NFR-3), create post with status='generating', trigger Pomelli async (FR-1)
-     - `GET /api/queue` — List posts with status `pending_review`, include image preview URL and caption (FR-2)
-     - `POST /api/queue/:id/approve` — Set status='approved'; if no scheduled_at, post to X immediately (FR-3)
-     - `POST /api/queue/:id/edit` — Update edited_caption field (FR-4)
-     - `DELETE /api/queue/:id` — Set status='rejected' (FR-5)
-     - `GET /api/history` — List posts with status='posted', include tweet URLs and timestamps (FR-6)
-     - `POST /api/settings` — Update settings table
-     - Serve downloaded Pomelli images as static files for preview (FR-7)
-     - Wire routes into server.ts
-     - Write integration tests for each endpoint
-   - Spec: specs/queue-management.md
-
-4. [ ] Task 4: Pomelli browser automation service
-   - Why: Core differentiator — this is what makes the flywheel work
-   - Details:
-     - Create `src/services/pomelli.ts` with `PommelliService` class
-     - Define all selectors in a `SELECTORS` object at top of file (FR-9, NFR-1: prefer data-testid, aria-label, text content)
-     - Launch persistent browser context at `DATA_DIR/browser-state/` (FR-1)
-     - Implement `checkSession(): Promise<boolean>` — navigate to Pomelli, verify logged-in (FR-2)
-     - Implement `createBusinessDNA(websiteUrl: string)` — enter URL, wait ~60s, confirm (FR-3)
-     - Implement `generateCampaign(idea: string): Promise<{images: string[], caption: string}>` (FR-4, FR-5):
-       - Click "Create Campaign", enter idea, wait for generation with 120s timeout (NFR-2)
-       - Download actual image files to `DATA_DIR/assets/` (FR-6)
-       - Scrape caption text (FR-7)
-     - Save assets to DB and set status to `pending_review` (FR-8)
-     - Take debug screenshots at each step to `DATA_DIR/debug/` (FR-10)
-     - Add 2-5 second human-mimicking delays between all actions (FR-11)
-     - Implement concurrency lock — never run multiple automations in parallel (NFR-3)
-     - Add `[pomelli]` prefixed console logging
-     - Write unit tests with mocked Playwright
-   - Spec: specs/pomelli-automation.md
 
 5. [ ] Task 5: Pomelli auth/session management
    - Why: Required for Pomelli service to work; separate due to complexity
