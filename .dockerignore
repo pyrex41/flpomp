@@ -1,0 +1,48 @@
+# Dependencies (reinstalled in container)
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Environment (secrets set via fly secrets)
+.env
+.env.*
+
+# Runtime data
+data/
+/data/
+
+# Database files
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Test files
+tests/
+vitest.config.*
+*.test.ts
+
+# Dev tooling config
+biome.json
+.vscode/
+.idea/
+.cursor/
+.claude/
+.taskmaster/
+
+# Documentation (not needed at runtime)
+*.md
+specs/
+prd.md
+IMPLEMENTATION_PLAN.md
+AGENTS.md
+CLAUDE.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Misc
+repomix-output.xml
+.stop
