@@ -23,20 +23,13 @@ Build order follows the PRD's recommended MVP sequence: scaffolding → X postin
 - [x] Task 8: Web dashboard — History and Settings pages — `src/views/pages/history.tsx` (HistoryPage, HistoryList, HistoryCard with tweet links, image thumbnails, timestamps, 30s HTMX polling), `src/views/pages/settings.tsx` (SettingsPage with website URL form for Business DNA, SettingsSaveResult/Error, SessionStatusPartial with authenticated/unauthenticated/error states), updated `src/routes/pages.tsx` (GET /history, GET /settings with saved URL, POST /settings with URL validation, GET /partials/history, GET /partials/session-status with Pomelli auth status mapping), history card + session status CSS in layout.tsx, 30 new tests in pages.test.ts (completed 2026-02-12)
 - [x] Task 9: End-to-end integration — `src/services/flywheel.ts` with `triggerPommelliGeneration()` (fire-and-forget async with concurrency lock check) and `approvePost()` (approve + optional immediate X posting for non-scheduled posts), wired into both API routes (`POST /api/ideas`, `POST /api/queue/:id/approve`) and page routes (`POST /submit-idea`, `POST /queue/:id/approve`), generation status in API response, error handling at each pipeline step. Also fixed pre-existing SQLite busy_timeout race condition in `db.ts`. 15 integration tests in `tests/flywheel.test.ts` covering full pipeline, Pomelli lock handling, scheduled vs immediate posting, X failure scenarios, edited captions, and reject flow. (completed 2026-02-12)
 - [x] Task 10: Scheduled posting with croner — `src/services/scheduler.ts` with `processDuePosts()` (queries approved posts where `scheduled_at <= now`, posts each via Twitter service), `startScheduler()` (croner `Cron` every minute with `protect: true`), `stopScheduler()`, `isSchedulerRunning()`. Added `getDueScheduledPosts()` DB query helper. Updated `approvePost()` in flywheel.ts to accept optional `scheduledAt` parameter (FR-1). Updated both API and page approve routes to pass through `scheduled_at` from request body. Added `scheduled_at` to `updatePostStatus` allowed fields. Wired scheduler start into `server.ts` (runs on boot, immediately checks for overdue posts for AC-4). Concurrency guard prevents overlapping ticks. Individual post failures don't affect others (NFR-2). `[cron]` prefixed logging throughout. 19 tests in `tests/scheduler.test.ts` covering getDueScheduledPosts query, processDuePosts pipeline, failure handling, status race protection, scheduler lifecycle, and startup overdue detection. Also fixed pre-existing biome-ignore suppression placement in flywheel.test.ts. (completed 2026-02-12)
+- [x] Task 11: Basic auth middleware — Conditional middleware in `server.ts` using HTTP Basic Auth, only active when `ADMIN_PASSWORD` env var is set. Skips `/health` endpoint (for Fly.io health probes). Timing-safe password comparison via `crypto.timingSafeEqual`. Any username accepted, only password checked. Changed `config.adminPassword` from static property to getter for dynamic env var reading (testability). 23 tests in `tests/middleware.test.ts` covering: no-auth-required mode, health check bypass, 401 for missing/wrong/malformed credentials, success with correct password, edge cases (colons in password, special chars, prefix attacks). (completed 2026-02-12)
 
 ## In Progress
 
-- [ ] **[CURRENT]** Task 11: Basic auth middleware
+- [ ] **[CURRENT]** Task 12: Dockerfile and Fly.io deployment config
 
 ## Backlog (Prioritized)
-
-11. [ ] Task 11: Basic auth middleware
-    - Why: Protects the dashboard when deployed
-    - Details:
-      - If `ADMIN_PASSWORD` is set in config, require basic auth on all routes
-      - Simple middleware in server.ts
-      - Skip auth for health check endpoint (`GET /health`)
-    - Spec: AGENTS.md § "Environment" (ADMIN_PASSWORD)
 
 12. [ ] Task 12: Dockerfile and Fly.io deployment config
     - Why: Deployment is the final step to make this usable

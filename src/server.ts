@@ -2,6 +2,7 @@
  * Entry point — Hono app with error middleware, logging, static file serving.
  */
 
+import { timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
@@ -17,6 +18,54 @@ const app = new Hono();
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
 app.use("*", logger());
+
+// ─── Basic auth (only when ADMIN_PASSWORD is set) ────────────────────────────
+
+app.use("*", async (c, next) => {
+	const password = config.adminPassword;
+	if (!password) {
+		return next();
+	}
+
+	// Health check is always public (for Fly.io / load balancer probes)
+	if (c.req.path === "/health") {
+		return next();
+	}
+
+	const authHeader = c.req.header("Authorization");
+	if (!authHeader?.startsWith("Basic ")) {
+		c.header("WWW-Authenticate", 'Basic realm="Pomelli X Flywheel"');
+		return c.text("Unauthorized", 401);
+	}
+
+	try {
+		const decoded = atob(authHeader.slice(6));
+		const colonIndex = decoded.indexOf(":");
+		if (colonIndex === -1) {
+			c.header("WWW-Authenticate", 'Basic realm="Pomelli X Flywheel"');
+			return c.text("Unauthorized", 401);
+		}
+
+		const providedPassword = decoded.slice(colonIndex + 1);
+
+		// Timing-safe comparison to prevent timing attacks
+		const expected = Buffer.from(password, "utf-8");
+		const provided = Buffer.from(providedPassword, "utf-8");
+
+		if (
+			expected.length !== provided.length ||
+			!timingSafeEqual(expected, provided)
+		) {
+			c.header("WWW-Authenticate", 'Basic realm="Pomelli X Flywheel"');
+			return c.text("Unauthorized", 401);
+		}
+	} catch {
+		c.header("WWW-Authenticate", 'Basic realm="Pomelli X Flywheel"');
+		return c.text("Unauthorized", 401);
+	}
+
+	return next();
+});
 
 // ─── Error handling ──────────────────────────────────────────────────────────
 

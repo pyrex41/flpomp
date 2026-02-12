@@ -36,7 +36,9 @@ export const config = {
 	port: Number.parseInt(env("PORT", "8080"), 10),
 	dataDir: env("DATA_DIR", "./data"),
 	websiteUrl: envOptional("WEBSITE_URL"),
-	adminPassword: envOptional("ADMIN_PASSWORD"),
+	get adminPassword() {
+		return envOptional("ADMIN_PASSWORD");
+	},
 
 	/** Derived paths */
 	get dbPath() {
