@@ -90,9 +90,9 @@ describe("flywheel integration", () => {
 			caption: "Flywheel generated caption",
 		});
 
-		// biome-ignore lint/suspicious/noExplicitAny: mock with flexible args
 		mockPostToX
 			.mockReset()
+			// biome-ignore lint/suspicious/noExplicitAny: mock with flexible args
 			.mockImplementation(async (database: any, post: any) => {
 				// Simulate what the real postToX does: update DB status
 				updatePostStatus(database, post.id, "posted", {

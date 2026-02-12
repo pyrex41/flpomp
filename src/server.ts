@@ -10,6 +10,7 @@ import { config } from "./config.ts";
 import { getDb } from "./db.ts";
 import { api } from "./routes/api.ts";
 import { pages } from "./routes/pages.tsx";
+import { startScheduler } from "./services/scheduler.ts";
 
 const app = new Hono();
 
@@ -73,7 +74,10 @@ app.route("/", pages);
 ensureDirectories();
 
 // Initialize database on startup
-getDb();
+const db = getDb();
+
+// Start the scheduled posting cron job
+startScheduler(db);
 
 console.log(`[server] Starting on port ${config.port}`);
 

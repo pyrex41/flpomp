@@ -107,7 +107,7 @@ async function runPommelliGeneration(
 /**
  * Approve a pending_review post and optionally post to X immediately.
  *
- * - If the post has a scheduled_at: mark as 'approved', leave for scheduler.
+ * - If the post has a scheduled_at (existing or provided): mark as 'approved', leave for scheduler.
  * - If no schedule and content is ready: approve + post to X immediately.
  * - If no schedule but content is missing: just approve (edge case).
  *
@@ -116,13 +116,25 @@ async function runPommelliGeneration(
 export async function approvePost(
 	db: Database,
 	post: Post,
+	/** Optional schedule time (FR-1). If provided, overrides existing scheduled_at. */
+	scheduledAt?: string,
 ): Promise<ApproveResult> {
+	// If a new scheduled_at is provided during approval, set it on the post
+	const effectiveScheduledAt = scheduledAt ?? post.scheduled_at;
+
 	// If scheduled for later, just mark as approved and wait for scheduler
-	if (post.scheduled_at) {
-		updatePostStatus(db, post.id, "approved");
+	if (effectiveScheduledAt) {
+		if (scheduledAt) {
+			// Update both status and scheduled_at
+			updatePostStatus(db, post.id, "approved", {
+				scheduled_at: scheduledAt,
+			});
+		} else {
+			updatePostStatus(db, post.id, "approved");
+		}
 		const updated = getPostById(db, post.id)!;
 		console.log(
-			`[flywheel] Post #${post.id} approved, scheduled for ${post.scheduled_at}`,
+			`[flywheel] Post #${post.id} approved, scheduled for ${effectiveScheduledAt}`,
 		);
 		return { post: updated };
 	}

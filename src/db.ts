@@ -145,6 +145,7 @@ export function updatePostStatus(
 			| "x_post_url"
 			| "posted_at"
 			| "error_message"
+			| "scheduled_at"
 		>
 	>,
 ): void {
@@ -182,4 +183,20 @@ export function setSetting(
 	database
 		.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")
 		.run(key, value);
+}
+
+/**
+ * Get approved posts whose scheduled_at time has arrived (or passed).
+ * Used by the scheduler cron job to find posts ready to be published.
+ *
+ * Returns posts in order of scheduled_at (oldest first) so overdue posts
+ * get posted before newly-due ones.
+ */
+export function getDueScheduledPosts(database: Database, now?: string): Post[] {
+	const currentTime = now ?? new Date().toISOString();
+	return database
+		.query(
+			"SELECT * FROM posts WHERE status = 'approved' AND scheduled_at IS NOT NULL AND scheduled_at <= ? ORDER BY scheduled_at ASC, id ASC",
+		)
+		.all(currentTime) as Post[];
 }

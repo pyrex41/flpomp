@@ -22,27 +22,13 @@ Build order follows the PRD's recommended MVP sequence: scaffolding → X postin
 - [x] Task 7: Web dashboard — Queue page — `src/views/components/post-card.tsx` (PostCard with Approve/Edit/Reject buttons, PostCardEditForm with inline caption editing), `src/views/pages/queue.tsx` (QueuePage, QueueList), updated `src/routes/pages.tsx` (GET /queue full page, POST approve/reject/edit HTMX actions, GET /partials/queue-card/:id and /edit endpoints, GET /partials/queue list partial), queue card CSS transitions in layout.tsx, 38 new tests covering queue listing, approve, reject, edit with validation, card partials (completed 2026-02-12)
 - [x] Task 8: Web dashboard — History and Settings pages — `src/views/pages/history.tsx` (HistoryPage, HistoryList, HistoryCard with tweet links, image thumbnails, timestamps, 30s HTMX polling), `src/views/pages/settings.tsx` (SettingsPage with website URL form for Business DNA, SettingsSaveResult/Error, SessionStatusPartial with authenticated/unauthenticated/error states), updated `src/routes/pages.tsx` (GET /history, GET /settings with saved URL, POST /settings with URL validation, GET /partials/history, GET /partials/session-status with Pomelli auth status mapping), history card + session status CSS in layout.tsx, 30 new tests in pages.test.ts (completed 2026-02-12)
 - [x] Task 9: End-to-end integration — `src/services/flywheel.ts` with `triggerPommelliGeneration()` (fire-and-forget async with concurrency lock check) and `approvePost()` (approve + optional immediate X posting for non-scheduled posts), wired into both API routes (`POST /api/ideas`, `POST /api/queue/:id/approve`) and page routes (`POST /submit-idea`, `POST /queue/:id/approve`), generation status in API response, error handling at each pipeline step. Also fixed pre-existing SQLite busy_timeout race condition in `db.ts`. 15 integration tests in `tests/flywheel.test.ts` covering full pipeline, Pomelli lock handling, scheduled vs immediate posting, X failure scenarios, edited captions, and reject flow. (completed 2026-02-12)
+- [x] Task 10: Scheduled posting with croner — `src/services/scheduler.ts` with `processDuePosts()` (queries approved posts where `scheduled_at <= now`, posts each via Twitter service), `startScheduler()` (croner `Cron` every minute with `protect: true`), `stopScheduler()`, `isSchedulerRunning()`. Added `getDueScheduledPosts()` DB query helper. Updated `approvePost()` in flywheel.ts to accept optional `scheduledAt` parameter (FR-1). Updated both API and page approve routes to pass through `scheduled_at` from request body. Added `scheduled_at` to `updatePostStatus` allowed fields. Wired scheduler start into `server.ts` (runs on boot, immediately checks for overdue posts for AC-4). Concurrency guard prevents overlapping ticks. Individual post failures don't affect others (NFR-2). `[cron]` prefixed logging throughout. 19 tests in `tests/scheduler.test.ts` covering getDueScheduledPosts query, processDuePosts pipeline, failure handling, status race protection, scheduler lifecycle, and startup overdue detection. Also fixed pre-existing biome-ignore suppression placement in flywheel.test.ts. (completed 2026-02-12)
 
 ## In Progress
 
-- [ ] **[CURRENT]** Task 10: Scheduled posting with croner
+- [ ] **[CURRENT]** Task 11: Basic auth middleware
 
 ## Backlog (Prioritized)
-
-10. [ ] Task 10: Scheduled posting with croner
-    - Why: Enables "post later" functionality
-    - Details:
-      - Create `src/services/scheduler.ts` (scheduling FR-5)
-      - Accept optional `scheduled_at` datetime on idea submission and approval (scheduling FR-1)
-      - Approved posts with future `scheduled_at` stay in `approved` status until due (scheduling FR-2)
-      - Cron job every minute: query approved posts where `scheduled_at <= now` (scheduling FR-3)
-      - Post each due item via Twitter service (scheduling FR-4)
-      - Posts approved with no `scheduled_at` are posted immediately, no cron delay (scheduling FR-6)
-      - Lightweight cron — just a DB query and conditional posting (scheduling NFR-1)
-      - Handle cron failures gracefully — log and retry next minute, don't crash server (scheduling NFR-2)
-      - Add `[cron]` prefixed logging
-      - Write tests with mocked time
-    - Spec: specs/scheduling.md
 
 11. [ ] Task 11: Basic auth middleware
     - Why: Protects the dashboard when deployed

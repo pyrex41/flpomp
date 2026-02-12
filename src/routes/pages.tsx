@@ -127,8 +127,15 @@ pages.post("/queue/:id/approve", async (c) => {
 		return c.html(<p class="form-error">Post is not pending review</p>, 409);
 	}
 
+	// Accept optional scheduled_at from form body (FR-1)
+	const body = await c.req.parseBody();
+	const scheduledAt =
+		typeof body.scheduled_at === "string" && body.scheduled_at.trim()
+			? body.scheduled_at.trim()
+			: undefined;
+
 	// Approve (and optionally post to X for non-scheduled posts)
-	const result = await approvePost(db(), post);
+	const result = await approvePost(db(), post, scheduledAt);
 
 	if (result.error) {
 		console.error(
