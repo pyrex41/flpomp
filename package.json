@@ -1,0 +1,27 @@
+{
+  "name": "flpomp",
+  "module": "src/server.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/server.ts",
+    "start": "bun run src/server.ts",
+    "test": "bunx --bun vitest run",
+    "lint": "bunx biome check src/ tests/",
+    "lint:fix": "bunx biome check --write src/ tests/",
+    "check": "bunx tsc --noEmit && bun run lint && bun run test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.15",
+    "@types/bun": "latest",
+    "vitest": "^4.0.18"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "croner": "^10.0.1",
+    "hono": "^4.11.9",
+    "twitter-api-v2": "^1.29.0"
+  }
+}

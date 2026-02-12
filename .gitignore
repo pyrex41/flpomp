@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Data directory (runtime data)
+data/
+/data/
+
+# Database
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+# Playwright browser state
+browser-state/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+
+# Bun
+bun.lock

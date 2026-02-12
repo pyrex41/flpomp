@@ -1,0 +1,3 @@
+[[bundles]]
+name = "ralph"
+source = "https://github.com/pyrex41/claude_skills"

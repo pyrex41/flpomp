@@ -1,0 +1,47 @@
+version: '3.8'
+
+# Agent Team - Docker Compose Configuration
+#
+# Usage:
+#   Start 4 agents:   docker-compose up --scale agent=4
+#   Start 8 agents:   docker-compose up --scale agent=8
+#   View logs:        docker-compose logs -f
+#   Stop all:         docker-compose down
+
+services:
+  agent:
+    build: .
+    environment:
+      # Each container gets unique ID from hostname
+      - AGENT_ID=${AGENT_ID:-}
+      # API key must be provided
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}
+      # Git remote for coordination
+      - UPSTREAM=${UPSTREAM:-origin}
+      - BRANCH=${BRANCH:-main}
+      # Model selection
+      - MODEL=${MODEL:-claude-sonnet-4-5-20250929}
+      # Test configuration
+      - FAST_MODE=${FAST_MODE:-false}
+      - SAMPLE_RATE=${SAMPLE_RATE:-10}
+    volumes:
+      # Mount project directory
+      - .:/workspace
+      # Persist logs outside container
+      - ./agent_logs:/workspace/agent_logs
+    working_dir: /workspace
+    # Restart on failure (but not on clean exit)
+    restart: on-failure
+    # Resource limits per agent
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+# Optional: shared volume for larger repos
+# volumes:
+#   repo-cache:
