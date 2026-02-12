@@ -14,24 +14,11 @@ Build order follows the PRD's recommended MVP sequence: scaffolding → X postin
 ## Completed
 
 - [x] Task 1: Project scaffolding — Bun + Hono + TypeScript + HTMX + SQLite setup (completed 2026-02-12)
+- [x] Task 2: X (Twitter) posting service — `src/services/twitter.ts` with image upload, tweet posting, validation, usage tracking, and 25 unit tests (completed 2026-02-12)
 
 ## In Progress
 
-- [ ] **[CURRENT]** Task 2: X (Twitter) posting service
-  - Details:
-    - Initialize Bun project with `bun init`
-    - Install dependencies: `hono`, `twitter-api-v2`, `playwright`, `croner`, `vitest`
-    - Create `tsconfig.json` with Hono JSX support (`jsx: "react-jsx"`, `jsxImportSource: "hono/jsx"`)
-    - Create `src/config.ts` — centralized env var access (X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET, WEBSITE_URL, PORT=8080, DATA_DIR=/data, ADMIN_PASSWORD)
-    - Create `src/db.ts` — SQLite schema with `posts` and `settings` tables per PRD schema, auto-migration on first run (queue-management FR-8, FR-9)
-    - Create `src/server.ts` — Hono app entry point with error middleware, logging, static file serving for `/data/assets/` images (dashboard FR-8)
-    - Create `src/views/layout.tsx` — Base HTML layout with HTMX script tag, responsive meta viewport (dashboard NFR-3)
-    - Add `package.json` scripts: `dev`, `build`, `test`, `lint`, `check`
-    - Add `.gitignore` (node_modules, *.db, .env, /data, browser-state)
-    - Add `.env.example` with all required/optional env vars documented
-    - Set up Biome for linting (fast, Bun-native)
-    - Validate: `bunx tsc --noEmit` passes, `bun run src/server.ts` starts on PORT
-  - Spec: specs/project-scaffold.md, specs/queue-management.md FR-8/FR-9, specs/dashboard.md FR-8/NFR-3
+- [ ] **[CURRENT]** Task 3: Queue management API routes
 
 ## Backlog (Prioritized)
 
