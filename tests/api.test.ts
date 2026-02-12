@@ -27,6 +27,34 @@ vi.mock("../src/services/twitter.ts", () => ({
 	},
 }));
 
+// Mock the Pomelli service so idea submission doesn't launch a browser
+const mockProcessIdea = vi.fn().mockResolvedValue({
+	images: ["/data/assets/mock-image.png"],
+	caption: "Mock generated caption",
+});
+
+vi.mock("../src/services/pomelli.ts", () => ({
+	isLocked: vi.fn(() => false),
+	_resetLock: vi.fn(),
+	getPommelliService: vi.fn(() => ({
+		processIdea: mockProcessIdea,
+		getAuthStatus: vi.fn().mockResolvedValue({
+			status: "active",
+			message: "Session active",
+			checkedAt: new Date().toISOString(),
+		}),
+		importCookies: vi.fn(),
+	})),
+	PommelliError: class extends Error {
+		code: string;
+		constructor(message: string, code: string) {
+			super(message);
+			this.code = code;
+			this.name = "PommelliError";
+		}
+	},
+}));
+
 describe("api routes", () => {
 	let db: ReturnType<typeof createTestDb>;
 

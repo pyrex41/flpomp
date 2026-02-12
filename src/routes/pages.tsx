@@ -17,6 +17,10 @@ import {
 	setSetting,
 	updatePostStatus,
 } from "../db.ts";
+import {
+	approvePost,
+	triggerPommelliGeneration,
+} from "../services/flywheel.ts";
 import { getPommelliService } from "../services/pomelli.ts";
 import { PostCard, PostCardEditForm } from "../views/components/post-card.tsx";
 import { Layout } from "../views/layout.tsx";
@@ -82,6 +86,9 @@ pages.post("/submit-idea", async (c) => {
 	const post = createPost(db(), idea, scheduledAt);
 	console.log(`[pages] Idea #${post.id} created: "${idea.slice(0, 50)}"`);
 
+	// Kick off Pomelli generation in the background (fire-and-forget).
+	triggerPommelliGeneration(db(), post.id, idea);
+
 	return c.html(<IdeaSubmitResult post={post} />);
 });
 
@@ -105,7 +112,7 @@ pages.get("/queue", (c) => {
 
 // ─── Queue actions (HTMX partial responses) ─────────────────────────────────
 
-pages.post("/queue/:id/approve", (c) => {
+pages.post("/queue/:id/approve", async (c) => {
 	const id = Number.parseInt(c.req.param("id"), 10);
 	if (Number.isNaN(id)) {
 		return c.html(<p class="form-error">Invalid post ID</p>, 400);
@@ -120,8 +127,28 @@ pages.post("/queue/:id/approve", (c) => {
 		return c.html(<p class="form-error">Post is not pending review</p>, 409);
 	}
 
-	updatePostStatus(db(), id, "approved");
-	console.log(`[pages] Post #${id} approved`);
+	// Approve (and optionally post to X for non-scheduled posts)
+	const result = await approvePost(db(), post);
+
+	if (result.error) {
+		console.error(
+			`[pages] Post #${id} approved but X posting failed: ${result.error}`,
+		);
+		return c.html(
+			<p class="form-error">
+				Approved but posting to X failed: {result.error}
+			</p>,
+			502,
+		);
+	}
+
+	if (result.tweet) {
+		console.log(
+			`[pages] Post #${id} approved and posted to X: ${result.tweet.tweetUrl}`,
+		);
+	} else {
+		console.log(`[pages] Post #${id} approved`);
+	}
 
 	// Return empty HTML — outerHTML swap removes the card from the list
 	return c.html("<!-- approved -->");

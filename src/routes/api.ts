@@ -17,11 +17,14 @@ import {
 	updatePostStatus,
 } from "../db.ts";
 import {
+	approvePost,
+	triggerPommelliGeneration,
+} from "../services/flywheel.ts";
+import {
 	getPommelliService,
 	type ImportedCookie,
 	PommelliError,
 } from "../services/pomelli.ts";
-import { postToX } from "../services/twitter.ts";
 
 const api = new Hono();
 
@@ -60,10 +63,11 @@ api.post("/ideas", async (c) => {
 
 	console.log(`[api] Idea #${post.id} created: "${idea.slice(0, 50)}"`);
 
-	// TODO: Task 4 will wire Pomelli async generation here
-	// For now, the post stays in 'generating' status until Pomelli service is built.
+	// Kick off Pomelli generation in the background (fire-and-forget).
+	// Post starts in 'generating' and transitions to 'pending_review' or 'failed'.
+	const generation = triggerPommelliGeneration(db(), post.id, idea);
 
-	return c.json({ post }, 201);
+	return c.json({ post, generation }, 201);
 });
 
 // ─── GET /api/queue — List pending_review posts (FR-2) ─────────────────────
@@ -103,42 +107,25 @@ api.post("/queue/:id/approve", async (c) => {
 		);
 	}
 
-	// If scheduled for later, just mark as approved and wait for scheduler
-	if (post.scheduled_at) {
-		updatePostStatus(db(), id, "approved");
-		const updated = getPostById(db(), id)!;
-		console.log(
-			`[api] Post #${id} approved, scheduled for ${post.scheduled_at}`,
+	// Approve (and optionally post to X for non-scheduled posts)
+	const result = await approvePost(db(), post);
+
+	if (result.error) {
+		console.error(
+			`[api] Post #${id} approved but X posting failed: ${result.error}`,
 		);
-		return c.json({ post: updated });
+		return c.json({ post: result.post, error: result.error }, 502);
 	}
 
-	// No schedule — post to X immediately (FR-3)
-	updatePostStatus(db(), id, "approved");
-	const caption = post.edited_caption ?? post.pomelli_caption;
-	const imagePath = post.pomelli_image_path;
-
-	if (!caption || !imagePath) {
-		// Content not ready yet — mark approved but can't post
-		const updated = getPostById(db(), id)!;
+	if (result.tweet) {
 		console.log(
-			`[api] Post #${id} approved but content not ready for immediate posting`,
+			`[api] Post #${id} approved and posted: ${result.tweet.tweetUrl}`,
 		);
-		return c.json({ post: updated });
+	} else {
+		console.log(`[api] Post #${id} approved`);
 	}
 
-	try {
-		const refreshed = getPostById(db(), id)!;
-		const result = await postToX(db(), refreshed);
-		const posted = getPostById(db(), id)!;
-		console.log(`[api] Post #${id} approved and posted: ${result.tweetUrl}`);
-		return c.json({ post: posted, tweet: result });
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		console.error(`[api] Failed to post #${id} to X: ${message}`);
-		const failed = getPostById(db(), id)!;
-		return c.json({ post: failed, error: message }, 502);
-	}
+	return c.json({ post: result.post, tweet: result.tweet });
 });
 
 // ─── POST /api/queue/:id/edit — Edit caption (FR-4) ────────────────────────

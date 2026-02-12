@@ -37,9 +37,17 @@ const mockGetAuthStatus = vi.fn().mockResolvedValue({
 	checkedAt: new Date().toISOString(),
 });
 
+const mockProcessIdea = vi.fn().mockResolvedValue({
+	images: ["/data/assets/mock-image.png"],
+	caption: "Mock generated caption",
+});
+
 vi.mock("../src/services/pomelli.ts", () => ({
+	isLocked: vi.fn(() => false),
+	_resetLock: vi.fn(),
 	getPommelliService: vi.fn(() => ({
 		getAuthStatus: mockGetAuthStatus,
+		processIdea: mockProcessIdea,
 	})),
 	PommelliError: class extends Error {
 		code: string;

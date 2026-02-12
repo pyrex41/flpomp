@@ -21,22 +21,13 @@ Build order follows the PRD's recommended MVP sequence: scaffolding → X postin
 - [x] Task 6: Web dashboard — Layout and New Post page — `src/views/pages/dashboard.tsx` (NewPostPage, IdeaSubmitResult, IdeaSubmitError, RecentPostsList components), `src/routes/pages.tsx` (HTMX form handler POST /submit-idea, polling partial GET /partials/recent, stub pages for /queue, /history, /settings), enhanced `src/views/layout.tsx` (HTMX indicator styles, status badges, post card styles, Pico CSS + HTMX CDN), improved `getAllPosts` ordering (id DESC tiebreaker), 25 tests in `tests/pages.test.ts` (completed 2026-02-12)
 - [x] Task 7: Web dashboard — Queue page — `src/views/components/post-card.tsx` (PostCard with Approve/Edit/Reject buttons, PostCardEditForm with inline caption editing), `src/views/pages/queue.tsx` (QueuePage, QueueList), updated `src/routes/pages.tsx` (GET /queue full page, POST approve/reject/edit HTMX actions, GET /partials/queue-card/:id and /edit endpoints, GET /partials/queue list partial), queue card CSS transitions in layout.tsx, 38 new tests covering queue listing, approve, reject, edit with validation, card partials (completed 2026-02-12)
 - [x] Task 8: Web dashboard — History and Settings pages — `src/views/pages/history.tsx` (HistoryPage, HistoryList, HistoryCard with tweet links, image thumbnails, timestamps, 30s HTMX polling), `src/views/pages/settings.tsx` (SettingsPage with website URL form for Business DNA, SettingsSaveResult/Error, SessionStatusPartial with authenticated/unauthenticated/error states), updated `src/routes/pages.tsx` (GET /history, GET /settings with saved URL, POST /settings with URL validation, GET /partials/history, GET /partials/session-status with Pomelli auth status mapping), history card + session status CSS in layout.tsx, 30 new tests in pages.test.ts (completed 2026-02-12)
+- [x] Task 9: End-to-end integration — `src/services/flywheel.ts` with `triggerPommelliGeneration()` (fire-and-forget async with concurrency lock check) and `approvePost()` (approve + optional immediate X posting for non-scheduled posts), wired into both API routes (`POST /api/ideas`, `POST /api/queue/:id/approve`) and page routes (`POST /submit-idea`, `POST /queue/:id/approve`), generation status in API response, error handling at each pipeline step. Also fixed pre-existing SQLite busy_timeout race condition in `db.ts`. 15 integration tests in `tests/flywheel.test.ts` covering full pipeline, Pomelli lock handling, scheduled vs immediate posting, X failure scenarios, edited captions, and reject flow. (completed 2026-02-12)
 
 ## In Progress
 
-- [ ] **[CURRENT]** Task 9: End-to-end integration — Idea → Pomelli → Queue → Approve → X
+- [ ] **[CURRENT]** Task 10: Scheduled posting with croner
 
 ## Backlog (Prioritized)
-
-9. [ ] Task 9: End-to-end integration — Idea → Pomelli → Queue → Approve → X
-   - Why: Wires all services together into the complete flywheel
-   - Details:
-     - When idea submitted: create DB record → kick off Pomelli generation async → update record with assets → set status to `pending_review`
-     - When approved (no schedule): post to X via Twitter service → update record with tweet ID/URL → set status to `posted`
-     - Handle errors at each step: set status to `failed` with error message
-     - Background async processing: Pomelli generation must not block the HTTP request
-     - Respect Pomelli concurrency lock from Task 4
-   - Spec: prd.md § "The Flywheel"
 
 10. [ ] Task 10: Scheduled posting with croner
     - Why: Enables "post later" functionality
