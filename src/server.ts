@@ -8,6 +8,7 @@ import { serveStatic } from "hono/bun";
 import { logger } from "hono/logger";
 import { config } from "./config.ts";
 import { getDb } from "./db.ts";
+import { api } from "./routes/api.ts";
 import { pages } from "./routes/pages.tsx";
 
 const app = new Hono();
@@ -58,6 +59,10 @@ app.use(
 app.get("/health", (c) => {
 	return c.json({ status: "ok" });
 });
+
+// ─── Mount API routes ────────────────────────────────────────────────────────
+
+app.route("/api", api);
 
 // ─── Mount page routes ───────────────────────────────────────────────────────
 

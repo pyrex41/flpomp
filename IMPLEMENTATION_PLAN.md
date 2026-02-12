@@ -15,14 +15,15 @@ Build order follows the PRD's recommended MVP sequence: scaffolding → X postin
 
 - [x] Task 1: Project scaffolding — Bun + Hono + TypeScript + HTMX + SQLite setup (completed 2026-02-12)
 - [x] Task 2: X (Twitter) posting service — `src/services/twitter.ts` with image upload, tweet posting, validation, usage tracking, and 25 unit tests (completed 2026-02-12)
+- [x] Task 3: Queue management API routes — `src/routes/api.ts` with 8 endpoints (ideas, queue, approve, edit, reject, history, settings GET/POST), wired into server.ts, 39 integration tests (completed 2026-02-12)
 
 ## In Progress
 
-- [ ] **[CURRENT]** Task 3: Queue management API routes
+- [ ] **[CURRENT]** Task 4: Pomelli browser automation service
 
 ## Backlog (Prioritized)
 
-3. [ ] Task 3: Queue management API routes
+4. [ ] Task 4: Pomelli browser automation service
    - Why: Provides the REST backbone that both Pomelli service and dashboard will use
    - Details:
      - Create `src/routes/api.ts` — Hono router with JSON API endpoints (queue-management NFR-2)
