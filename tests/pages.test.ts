@@ -45,6 +45,8 @@ const mockProcessIdea = vi.fn().mockResolvedValue({
 vi.mock("../src/services/pomelli.ts", () => ({
 	isLocked: vi.fn(() => false),
 	_resetLock: vi.fn(),
+	getLastSessionStatus: vi.fn(() => null),
+	_setLastSessionStatus: vi.fn(),
 	getPommelliService: vi.fn(() => ({
 		getAuthStatus: mockGetAuthStatus,
 		processIdea: mockProcessIdea,

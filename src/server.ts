@@ -69,13 +69,55 @@ app.use("*", async (c, next) => {
 
 // ─── Error handling ──────────────────────────────────────────────────────────
 
-app.onError((err, c) => {
-	console.error("[server] Unhandled error:", err);
-	return c.json({ error: "Internal server error" }, 500);
+/**
+ * Determine if a request should receive an HTML or JSON error response.
+ * API routes (/api/*) always get JSON. Page routes get HTML.
+ * Also respects the Accept header as a secondary signal.
+ */
+function wantsJson(c: import("hono").Context): boolean {
+	if (c.req.path.startsWith("/api/")) return true;
+	const accept = c.req.header("Accept") ?? "";
+	return accept.includes("application/json") && !accept.includes("text/html");
+}
+
+app.onError(async (err, c) => {
+	const message = err instanceof Error ? err.message : String(err);
+	console.error(
+		`[server] Unhandled error on ${c.req.method} ${c.req.path}:`,
+		err,
+	);
+
+	if (wantsJson(c)) {
+		return c.json({ error: "Internal server error" }, 500);
+	}
+
+	// Lazy-import to avoid circular dependency at module load time
+	const { ErrorPage } = await import("./views/pages/error.tsx");
+	return c.html(
+		ErrorPage({
+			status: 500,
+			message: "An unexpected error occurred. Please try again.",
+			detail: process.env.NODE_ENV !== "production" ? message : undefined,
+		}),
+		500,
+	);
 });
 
-app.notFound((c) => {
-	return c.json({ error: "Not found" }, 404);
+app.notFound(async (c) => {
+	console.warn(`[server] 404: ${c.req.method} ${c.req.path}`);
+
+	if (wantsJson(c)) {
+		return c.json({ error: "Not found" }, 404);
+	}
+
+	const { ErrorPage } = await import("./views/pages/error.tsx");
+	return c.html(
+		ErrorPage({
+			status: 404,
+			message: "The page you're looking for doesn't exist.",
+		}),
+		404,
+	);
 });
 
 // ─── Ensure data directories exist ──────────────────────────────────────────
@@ -128,7 +170,9 @@ const db = getDb();
 // Start the scheduled posting cron job
 startScheduler(db);
 
-console.log(`[server] Starting on port ${config.port}`);
+console.log(
+	`[server] Starting on port ${config.port} (data=${config.dataDir}, admin_auth=${config.adminPassword ? "enabled" : "disabled"})`,
+);
 
 export default {
 	port: config.port,

@@ -25,23 +25,15 @@ Build order follows the PRD's recommended MVP sequence: scaffolding → X postin
 - [x] Task 10: Scheduled posting with croner — `src/services/scheduler.ts` with `processDuePosts()` (queries approved posts where `scheduled_at <= now`, posts each via Twitter service), `startScheduler()` (croner `Cron` every minute with `protect: true`), `stopScheduler()`, `isSchedulerRunning()`. Added `getDueScheduledPosts()` DB query helper. Updated `approvePost()` in flywheel.ts to accept optional `scheduledAt` parameter (FR-1). Updated both API and page approve routes to pass through `scheduled_at` from request body. Added `scheduled_at` to `updatePostStatus` allowed fields. Wired scheduler start into `server.ts` (runs on boot, immediately checks for overdue posts for AC-4). Concurrency guard prevents overlapping ticks. Individual post failures don't affect others (NFR-2). `[cron]` prefixed logging throughout. 19 tests in `tests/scheduler.test.ts` covering getDueScheduledPosts query, processDuePosts pipeline, failure handling, status race protection, scheduler lifecycle, and startup overdue detection. Also fixed pre-existing biome-ignore suppression placement in flywheel.test.ts. (completed 2026-02-12)
 - [x] Task 11: Basic auth middleware — Conditional middleware in `server.ts` using HTTP Basic Auth, only active when `ADMIN_PASSWORD` env var is set. Skips `/health` endpoint (for Fly.io health probes). Timing-safe password comparison via `crypto.timingSafeEqual`. Any username accepted, only password checked. Changed `config.adminPassword` from static property to getter for dynamic env var reading (testability). 23 tests in `tests/middleware.test.ts` covering: no-auth-required mode, health check bypass, 401 for missing/wrong/malformed credentials, success with correct password, edge cases (colons in password, special chars, prefix attacks). (completed 2026-02-12)
 - [x] Task 12: Dockerfile and Fly.io deployment config — `Dockerfile` (oven/bun:1 base, Playwright/Chromium system deps, production-only `bun install`, `bunx playwright install chromium`, `--no-sandbox` env), `fly.toml` (pomelli-x-flywheel app, ord region, shared-cpu-2x 1GB VM, /data volume mount, /health check, force_https, auto suspend/start), `.dockerignore` (excludes node_modules, tests, docs, dev tooling, runtime data). (completed 2026-02-12)
+- [x] Task 13: Error handling, resilience, and polish — Hono error middleware (HTML error pages for page routes, JSON for API routes via `wantsJson()` detection, `ErrorPage` component), Playwright retry logic (`withRetry()` helper with configurable attempts/backoff wrapping key `generateCampaign` interactions), X API usage endpoint (`GET /api/usage` with month/used/limit/remaining/percentUsed), image resize fallback (`src/services/image.ts` using Sharp with progressive quality reduction and PNG→JPEG conversion as last resort), session expiry banner (in-memory `_lastSessionStatus` cache updated by `getAuthStatus()` and `processIdea()`, `SessionBanner` component in Layout shown on all pages when session is expired/error), enhanced startup logging. 28 new tests in `tests/resilience.test.tsx`. 274 total tests passing. (completed 2026-02-12)
 
 ## In Progress
 
-- [ ] **[CURRENT]** Task 13: Error handling, resilience, and polish
+(none)
 
 ## Backlog (Prioritized)
 
-13. [ ] Task 13: Error handling, resilience, and polish
-    - Why: Production readiness
-    - Details:
-      - Hono error middleware for graceful error pages
-      - Playwright retry logic (selectors may intermittently fail)
-      - X API rate limit tracking in DB (x-posting NFR-1: track usage within free tier 1,500 posts/month)
-      - Image size validation with resize fallback (Sharp or similar)
-      - Session expiry detection and alerting via dashboard banner
-      - Comprehensive logging across all services
-    - Spec: prd.md § "Risks & Mitigations", x-posting NFR-1
+(empty — all tasks complete)
 
 ## Discovered Issues
 

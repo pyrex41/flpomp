@@ -107,6 +107,24 @@ export interface AuthStatus {
 	checkedAt: string;
 }
 
+// ─── Session status persistence ───────────────────────────────────────────────
+
+/**
+ * In-memory cache of the last known session status.
+ * Updated whenever getAuthStatus() is called.
+ * This allows the layout banner to show status without launching Playwright.
+ */
+let _lastSessionStatus: AuthStatus | null = null;
+
+export function getLastSessionStatus(): AuthStatus | null {
+	return _lastSessionStatus;
+}
+
+/** Reset cached session status (for testing). */
+export function _setLastSessionStatus(status: AuthStatus | null): void {
+	_lastSessionStatus = status;
+}
+
 export interface PommelliOptions {
 	/** Override browser state dir (for testing). */
 	browserStateDir?: string;
@@ -222,6 +240,56 @@ function ensureDir(dir: string): void {
 	if (!existsSync(dir)) {
 		mkdirSync(dir, { recursive: true });
 	}
+}
+
+// ─── Retry helper (resilience for intermittent selector failures) ──────────
+
+export interface RetryOptions {
+	/** Maximum number of attempts (default 3). */
+	maxAttempts?: number;
+	/** Delay in ms between retries (default 1000). */
+	delayMs?: number;
+	/** Label for logging (default "operation"). */
+	label?: string;
+}
+
+/**
+ * Retry an async operation with exponential backoff.
+ * Used to handle intermittent Playwright selector failures.
+ */
+export async function withRetry<T>(
+	fn: () => Promise<T>,
+	options?: RetryOptions,
+): Promise<T> {
+	const maxAttempts = options?.maxAttempts ?? 3;
+	const baseDelay = options?.delayMs ?? 1_000;
+	const label = options?.label ?? "operation";
+
+	let lastError: Error | undefined;
+
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			return await fn();
+		} catch (err) {
+			lastError = err instanceof Error ? err : new Error(String(err));
+
+			if (attempt === maxAttempts) {
+				console.error(
+					`[pomelli] ${label} failed after ${maxAttempts} attempts: ${lastError.message}`,
+				);
+				throw lastError;
+			}
+
+			const delay = baseDelay * attempt; // linear backoff
+			console.warn(
+				`[pomelli] ${label} attempt ${attempt}/${maxAttempts} failed: ${lastError.message}. Retrying in ${delay}ms...`,
+			);
+			await new Promise((resolve) => setTimeout(resolve, delay));
+		}
+	}
+
+	// Should never reach here, but TypeScript needs this
+	throw lastError;
 }
 
 // ─── PommelliService ──────────────────────────────────────────────────────────
@@ -404,9 +472,12 @@ export class PommelliService {
 	/**
 	 * Check the Google authentication status by navigating to Pomelli.
 	 * Returns structured status with message, completes within 10s (NFR-1).
+	 * Caches the result so the layout banner can display it without re-checking.
 	 */
 	async getAuthStatus(): Promise<AuthStatus> {
 		const checkedAt = new Date().toISOString();
+
+		let result: AuthStatus;
 
 		try {
 			const isActive = await Promise.race([
@@ -420,28 +491,33 @@ export class PommelliService {
 			]);
 
 			if (isActive) {
-				return {
+				result = {
 					status: "active",
 					message: "Google session is active. Pomelli automation is ready.",
 					checkedAt,
 				};
+			} else {
+				result = {
+					status: "expired",
+					message:
+						"Google session has expired. Please import fresh cookies via Settings to re-authenticate.",
+					checkedAt,
+				};
 			}
-
-			return {
-				status: "expired",
-				message:
-					"Google session has expired. Please import fresh cookies via Settings to re-authenticate.",
-				checkedAt,
-			};
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			console.error(`[pomelli] Auth status check error: ${message}`);
-			return {
+			result = {
 				status: "error",
 				message: `Session check failed: ${message}`,
 				checkedAt,
 			};
 		}
+
+		// Cache for the layout banner
+		_lastSessionStatus = result;
+
+		return result;
 	}
 
 	// ─── Session check (FR-2) ───────────────────────────────────────────────
@@ -587,6 +663,9 @@ export class PommelliService {
 	 * Generate a campaign from an idea.
 	 * Downloads images to DATA_DIR/assets/ and extracts the caption.
 	 *
+	 * Key interactions are wrapped with retry logic to handle intermittent
+	 * selector failures (Pomelli UI may be slow to render or change between versions).
+	 *
 	 * @returns Paths to downloaded images and the caption text.
 	 * @throws PommelliError on timeout (NFR-2) or generation failure.
 	 */
@@ -595,6 +674,9 @@ export class PommelliService {
 			`[pomelli] Generating campaign: "${idea.slice(0, 60)}${idea.length > 60 ? "..." : ""}"`,
 		);
 		const page = await this.getPage();
+		const retryOpts = this.skipDelay
+			? { maxAttempts: 1, delayMs: 0 }
+			: undefined;
 
 		await page.goto(this.baseUrl, {
 			waitUntil: "networkidle",
@@ -603,23 +685,38 @@ export class PommelliService {
 		await this.delay();
 		await debugScreenshot(page, "campaign_start", this.debugDir);
 
-		// Click "Create Campaign"
-		const createBtn = page.locator(SELECTORS.createCampaign).first();
-		await createBtn.waitFor({ state: "visible", timeout: 15_000 });
-		await createBtn.click();
+		// Click "Create Campaign" — with retry for intermittent selector failures
+		await withRetry(
+			async () => {
+				const createBtn = page.locator(SELECTORS.createCampaign).first();
+				await createBtn.waitFor({ state: "visible", timeout: 15_000 });
+				await createBtn.click();
+			},
+			{ ...retryOpts, label: "click Create Campaign" },
+		);
 		await this.delay();
 		await debugScreenshot(page, "campaign_create_clicked", this.debugDir);
 
-		// Enter the idea/prompt
-		const ideaInput = page.locator(SELECTORS.campaignIdeaInput).first();
-		await ideaInput.waitFor({ state: "visible", timeout: 10_000 });
-		await ideaInput.fill(idea);
+		// Enter the idea/prompt — with retry
+		await withRetry(
+			async () => {
+				const ideaInput = page.locator(SELECTORS.campaignIdeaInput).first();
+				await ideaInput.waitFor({ state: "visible", timeout: 10_000 });
+				await ideaInput.fill(idea);
+			},
+			{ ...retryOpts, label: "fill idea input" },
+		);
 		await this.delay();
 		await debugScreenshot(page, "campaign_idea_entered", this.debugDir);
 
-		// Submit / generate
-		const generateBtn = page.locator(SELECTORS.campaignGenerate).first();
-		await generateBtn.click();
+		// Submit / generate — with retry
+		await withRetry(
+			async () => {
+				const generateBtn = page.locator(SELECTORS.campaignGenerate).first();
+				await generateBtn.click();
+			},
+			{ ...retryOpts, label: "click Generate" },
+		);
 		await debugScreenshot(page, "campaign_generate_clicked", this.debugDir);
 
 		console.log("[pomelli] Waiting for AI generation (up to 120s)...");
@@ -857,6 +954,12 @@ export class PommelliService {
 			if (!sessionOk) {
 				const errMsg =
 					"Google session expired. Please re-authenticate via Settings.";
+				// Cache the expired state for the layout banner
+				_lastSessionStatus = {
+					status: "expired",
+					message: errMsg,
+					checkedAt: new Date().toISOString(),
+				};
 				updatePostStatus(db, postId, "failed", {
 					error_message: errMsg,
 				});

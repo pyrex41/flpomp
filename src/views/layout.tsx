@@ -1,9 +1,14 @@
 /**
  * Base HTML layout with HTMX loaded from CDN.
  * All pages use this as their outer shell.
+ *
+ * Includes a session alert banner (HTMX-loaded) that shows when the
+ * Pomelli Google session is expired or in error state.
  */
 
 import type { Child } from "hono/jsx";
+import { getLastSessionStatus } from "../services/pomelli.ts";
+import { SessionBanner } from "./components/session-banner.tsx";
 
 interface LayoutProps {
 	title?: string;
@@ -117,6 +122,45 @@ export function Layout({ title, children }: LayoutProps) {
 					border-left: 4px solid #dc2626;
 				}
 
+				/* ── Session alert banner ──────────────────────── */
+				.session-banner {
+					display: flex;
+					align-items: center;
+					gap: 0.75rem;
+					padding: 0.75rem 1rem;
+					border-radius: 6px;
+					margin-bottom: 1.5rem;
+					font-size: 0.9rem;
+				}
+				.session-banner-warning {
+					background: #fef3c7;
+					border: 1px solid #f59e0b;
+					color: #92400e;
+				}
+				.session-banner-error {
+					background: #fee2e2;
+					border: 1px solid #ef4444;
+					color: #991b1b;
+				}
+				.session-banner-icon {
+					font-size: 1.2rem;
+					flex-shrink: 0;
+				}
+				.session-banner-content {
+					flex: 1;
+				}
+				.session-banner-content strong {
+					display: block;
+				}
+				.session-banner-message {
+					font-size: 0.85rem;
+					opacity: 0.85;
+				}
+				.session-banner-action {
+					white-space: nowrap;
+					font-weight: 600;
+				}
+
 				/* ── Utility ────────────────────────────────────── */
 				.secondary {
 					color: var(--pico-muted-color);
@@ -148,7 +192,10 @@ export function Layout({ title, children }: LayoutProps) {
 						</li>
 					</ul>
 				</nav>
-				<main class="container">{children}</main>
+				<main class="container">
+					<SessionBanner sessionStatus={getLastSessionStatus()} />
+					{children}
+				</main>
 				<footer class="container">
 					<small class="secondary">Pomelli Flywheel</small>
 				</footer>

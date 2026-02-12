@@ -45,9 +45,13 @@ export function triggerPommelliGeneration(
 	postId: number,
 	idea: string,
 ): GenerationStatus {
+	console.log(
+		`[flywheel] Requested generation for post #${postId}: "${idea.slice(0, 60)}${idea.length > 60 ? "..." : ""}"`,
+	);
+
 	// Check if another generation is already running
 	if (isLocked()) {
-		console.log(
+		console.warn(
 			`[flywheel] Post #${postId}: Pomelli is busy, queuing for later`,
 		);
 		// Don't fail the post — leave it in 'generating' status.

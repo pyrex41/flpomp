@@ -25,6 +25,7 @@ import {
 	type ImportedCookie,
 	PommelliError,
 } from "../services/pomelli.ts";
+import { getMonthlyUsage } from "../services/twitter.ts";
 
 const api = new Hono();
 
@@ -323,6 +324,23 @@ api.get("/settings", (c) => {
 		settings: {
 			website_url: websiteUrl,
 		},
+	});
+});
+
+// ─── GET /api/usage — X API usage stats (NFR-1) ───────────────────────────
+
+api.get("/usage", (c) => {
+	const usage = getMonthlyUsage(db());
+	const limit = 1500;
+	const remaining = Math.max(0, limit - usage);
+	const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+	return c.json({
+		month,
+		used: usage,
+		limit,
+		remaining,
+		percentUsed: Math.round((usage / limit) * 100),
 	});
 });
 

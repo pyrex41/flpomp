@@ -33,10 +33,18 @@ describe("server", () => {
 	});
 
 	describe("404 handling", () => {
-		it("should return 404 JSON for unknown routes", async () => {
+		it("should return 404 HTML for unknown page routes", async () => {
 			const res = await app.request("/nonexistent");
 			expect(res.status).toBe(404);
-			const body = await res.json();
+			const text = await res.text();
+			expect(text).toContain("404");
+			expect(text).toContain("Not Found");
+		});
+
+		it("should return 404 JSON for unknown API routes", async () => {
+			const res = await app.request("/api/nonexistent");
+			expect(res.status).toBe(404);
+			const body = (await res.json()) as { error: string };
 			expect(body).toEqual({ error: "Not found" });
 		});
 	});

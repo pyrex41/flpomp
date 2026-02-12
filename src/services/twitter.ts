@@ -12,6 +12,7 @@ import { extname } from "node:path";
 import { EUploadMimeType, TwitterApi } from "twitter-api-v2";
 import { config } from "../config.ts";
 import { getSetting, type Post, setSetting, updatePostStatus } from "../db.ts";
+import { ensureImageWithinLimit } from "./image.ts";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -197,8 +198,24 @@ export async function postToX(
 
 	// Validate inputs
 	validateCaption(caption);
-	const mimeType = await validateImage(imagePath);
 	checkUsageLimit(db);
+
+	// Validate and resize image if needed (PRD: "resize if needed with Sharp")
+	let finalImagePath = imagePath;
+	try {
+		const imageResult = await ensureImageWithinLimit(imagePath);
+		finalImagePath = imageResult.path;
+		if (imageResult.resized) {
+			console.log(
+				`[twitter] Image resized: ${imagePath} → ${finalImagePath} (${(imageResult.sizeBytes / 1024 / 1024).toFixed(1)}MB)`,
+			);
+		}
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		throw new TwitterPostError(msg, "IMAGE_TOO_LARGE");
+	}
+
+	const mimeType = await validateImage(finalImagePath);
 
 	console.log(
 		`[twitter] Posting idea #${post.id}: "${caption.slice(0, 50)}${caption.length > 50 ? "..." : ""}"`,
@@ -208,8 +225,8 @@ export async function postToX(
 		const twitterClient = client ?? createClient();
 
 		// Upload image via v1.1 media upload endpoint (FR-2)
-		console.log(`[twitter] Uploading image: ${imagePath}`);
-		const mediaId = await twitterClient.v1.uploadMedia(imagePath, {
+		console.log(`[twitter] Uploading image: ${finalImagePath}`);
+		const mediaId = await twitterClient.v1.uploadMedia(finalImagePath, {
 			mimeType,
 		});
 		console.log(`[twitter] Image uploaded, media_id: ${mediaId}`);
