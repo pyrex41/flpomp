@@ -102,11 +102,13 @@ export interface Setting {
 export function getAllPosts(database: Database, status?: string): Post[] {
 	if (status) {
 		return database
-			.query("SELECT * FROM posts WHERE status = ? ORDER BY created_at DESC")
+			.query(
+				"SELECT * FROM posts WHERE status = ? ORDER BY created_at DESC, id DESC",
+			)
 			.all(status) as Post[];
 	}
 	return database
-		.query("SELECT * FROM posts ORDER BY created_at DESC")
+		.query("SELECT * FROM posts ORDER BY created_at DESC, id DESC")
 		.all() as Post[];
 }
 

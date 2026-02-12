@@ -18,24 +18,13 @@ Build order follows the PRD's recommended MVP sequence: scaffolding → X postin
 - [x] Task 3: Queue management API routes — `src/routes/api.ts` with 8 endpoints (ideas, queue, approve, edit, reject, history, settings GET/POST), wired into server.ts, 39 integration tests (completed 2026-02-12)
 - [x] Task 4: Pomelli browser automation service — `src/services/pomelli.ts` with PommelliService class, SELECTORS object, persistent browser context, session check, Business DNA creation, campaign generation, image download, caption extraction, DB integration, concurrency lock, debug screenshots, human-mimicking delays, and 24 unit tests (completed 2026-02-12)
 - [x] Task 5: Pomelli auth/session management — `importCookies()` method on PommelliService (validates, filters Google cookies, injects into Playwright context), `getAuthStatus()` with 10s timeout, `GET /api/auth/status` and `POST /api/auth/pomelli` API routes, `normalizeSameSite` helper, 27 tests in `tests/auth.test.ts` (completed 2026-02-12)
+- [x] Task 6: Web dashboard — Layout and New Post page — `src/views/pages/dashboard.tsx` (NewPostPage, IdeaSubmitResult, IdeaSubmitError, RecentPostsList components), `src/routes/pages.tsx` (HTMX form handler POST /submit-idea, polling partial GET /partials/recent, stub pages for /queue, /history, /settings), enhanced `src/views/layout.tsx` (HTMX indicator styles, status badges, post card styles, Pico CSS + HTMX CDN), improved `getAllPosts` ordering (id DESC tiebreaker), 25 tests in `tests/pages.test.ts` (completed 2026-02-12)
 
 ## In Progress
 
-- [ ] **[CURRENT]** Task 6: Web dashboard — Layout and New Post page
+- [ ] **[CURRENT]** Task 7: Web dashboard — Queue page
 
 ## Backlog (Prioritized)
-
-6. [ ] Task 6: Web dashboard — Layout and New Post page
-   - Why: First user-facing screen; enables submitting ideas into the pipeline
-   - Details:
-     - Create `src/routes/pages.tsx` — Hono router for HTML pages (dashboard FR-6)
-     - Create `src/views/pages/dashboard.tsx` — New Post form (dashboard FR-1)
-     - HTMX form: text input for idea, optional datetime picker for scheduling, submit via `hx-post="/api/ideas"` (dashboard FR-7)
-     - Show recent queue items inline via `hx-get="/api/queue"` with polling
-     - Navigation tabs: New Post, Queue, History, Settings (dashboard FR-9)
-     - Clean, responsive CSS (no framework needed) with mobile-friendly layout (dashboard NFR-2, NFR-3)
-     - No client-side JS framework — HTMX + server templates only (dashboard NFR-1)
-   - Spec: specs/dashboard.md
 
 7. [ ] Task 7: Web dashboard — Queue page
    - Why: Human-in-the-loop approval is the core UX

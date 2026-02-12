@@ -28,15 +28,70 @@ export function Layout({ title, children }: LayoutProps) {
 					crossorigin="anonymous"
 				/>
 				<style>{`
+					/* ── Navigation ─────────────────────────────────── */
 					nav ul li { list-style: none; }
-					.post-card { border: 1px solid var(--pico-muted-border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-					.post-card img { max-width: 100%; border-radius: 4px; }
-					.status-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.85rem; font-weight: 600; }
+					nav a[aria-current="page"] {
+						font-weight: 700;
+						text-decoration: underline;
+						text-underline-offset: 4px;
+					}
+
+					/* ── Post cards ─────────────────────────────────── */
+					.post-card {
+						border: 1px solid var(--pico-muted-border-color);
+						border-radius: 8px;
+						padding: 1rem;
+						margin-bottom: 1rem;
+					}
+					.post-card img {
+						max-width: 100%;
+						border-radius: 4px;
+					}
+					.post-card-header {
+						display: flex;
+						justify-content: space-between;
+						align-items: center;
+						margin-bottom: 0.5rem;
+					}
+
+					/* ── Status badges ──────────────────────────────── */
+					.status-badge {
+						display: inline-block;
+						padding: 0.2rem 0.6rem;
+						border-radius: 4px;
+						font-size: 0.85rem;
+						font-weight: 600;
+					}
 					.status-generating { background: #fef3c7; color: #92400e; }
 					.status-pending_review { background: #dbeafe; color: #1e40af; }
 					.status-approved { background: #d1fae5; color: #065f46; }
 					.status-posted { background: #e0e7ff; color: #3730a3; }
 					.status-failed { background: #fee2e2; color: #991b1b; }
+					.status-rejected { background: #f3f4f6; color: #6b7280; }
+
+					/* ── HTMX indicator ─────────────────────────────── */
+					.htmx-indicator {
+						opacity: 0;
+						transition: opacity 200ms ease-in;
+					}
+					.htmx-request .htmx-indicator,
+					.htmx-request.htmx-indicator {
+						opacity: 1;
+					}
+
+					/* ── Form feedback ──────────────────────────────── */
+					.form-error {
+						color: var(--pico-del-color);
+						font-weight: 600;
+					}
+
+					/* ── Utility ────────────────────────────────────── */
+					.secondary {
+						color: var(--pico-muted-color);
+					}
+					hr {
+						margin: 2rem 0;
+					}
 				`}</style>
 			</head>
 			<body>
@@ -63,7 +118,7 @@ export function Layout({ title, children }: LayoutProps) {
 				</nav>
 				<main class="container">{children}</main>
 				<footer class="container">
-					<small>Pomelli → X Flywheel</small>
+					<small class="secondary">Pomelli Flywheel</small>
 				</footer>
 			</body>
 		</html>
